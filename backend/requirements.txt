@@ -1,0 +1,27 @@
+# --- Web framework ---
+fastapi
+uvicorn[standard]
+
+# --- Data validation / schemas ---
+pydantic
+pydantic-settings
+
+# --- Database ---
+sqlalchemy
+alembic              # migrations
+psycopg2-binary      # PostgreSQL driver (sync). Use asyncpg instead if you go fully async.
+
+# --- Auth (Supabase) ---
+supabase             # Supabase Python client — handles auth + talks to your Postgres
+python-jose[cryptography]   # only needed if you verify Supabase JWTs manually in FastAPI
+
+# --- AI / LLM ---
+anthropic            # swap for openai if you're using a different provider
+
+# --- Utilities ---
+python-dotenv        # load .env locally
+python-multipart     # needed if any endpoint accepts file/form uploads (e.g. transcript upload)
+
+# --- Testing ---
+pytest
+httpx                # FastAPI's TestClient dependency, also used for async test requests
