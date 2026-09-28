@@ -144,6 +144,10 @@ Something the user promised to do, usually extracted from natural language.
 | participants | string[] | |
 | transcript | text, nullable | raw input |
 | summary | text, nullable | AI-generated |
+| meet_link | string, nullable | Google Meet URL, set when using the live bot (see Meeting Bot integration below) |
+| status | enum, nullable | scheduled / bot_active / ended / failed — only meaningful for bot-captured meetings |
+| bot_process_id | integer, nullable | OS process id of the running scraper, used to stop it |
+| bot_transcript_path | string, nullable | file path where the bot is writing captions live |
 
 **Owner:** Dev A
 
@@ -182,9 +186,28 @@ Something the user promised to do, usually extracted from natural language.
 
 ---
 
+## 10. GoogleCredentials — NEW, added for real Calendar integration
+
+Stores one connected Google account per user. Treat like a passwords table in terms of care — never log these values.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | UUID | |
+| user_id | UUID | FK → User, unique (one connection per user for MVP) |
+| access_token | string | short-lived (~1hr), refreshed automatically |
+| refresh_token | string | long-lived, used to get new access tokens without re-consent |
+| token_expiry | timestamp, nullable | |
+| connected_at | timestamp | |
+
+**Owner:** Dev A / Dev B (created via the OAuth callback route, but lives alongside the other models)
+
+---
+
 ## Open questions to resolve together before building
 
 1. Do we generate `id`s as UUIDs (recommended, works cleanly with Supabase) or auto-increment integers?
 2. Confirm: ContextItem is written *by every service*, not queried instead of the structured tables. Does everyone agree this is the pattern?
 3. `participants` as a string array — good enough for MVP, or does anyone want a real join table? (Recommendation: keep it simple, this is explicitly Phase 3 work.)
 4. Where does `confidence` threshold live for auto-accepting vs. flagging a Commitment for user review? (Recommendation: put it in `services/commitment_service.py`, not hardcoded in the AI prompt.)
+5. **New:** the meeting-bot fields on Meeting only apply to bot-captured meetings — confirm the team is fine with several nullable fields on one table rather than a separate `MeetingBotSession` table. (Recommendation: fine for MVP; revisit only if it starts feeling cluttered.)
+6. **New:** GoogleCredentials assumes one Google account per user. If anyone needs multiple connected accounts, this needs a redesign — confirm this isn't a requirement before building.

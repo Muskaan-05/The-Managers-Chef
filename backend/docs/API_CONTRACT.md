@@ -123,6 +123,34 @@ Response:
 Returns the proactive "meeting prep" brief — relevant previous decisions, open commitments, and notes for an upcoming meeting.
 Response: `{ "brief": [{ "type": str, "content": str, "source_reference": str }] }`
 
+### POST /api/meetings/{meeting_id}/join — NEW, Google Meet bot integration
+Starts the live caption-scraping bot in the background. The frontend separately redirects the human user to the same `meet_link`, independent of this call.
+Request: `{ "meet_link": str }`
+Response: `{ "status": "bot_active" }`
+
+### POST /api/meetings/{meeting_id}/end — NEW, Google Meet bot integration
+Stops the bot, reads the transcript it captured, and runs it through the same pipeline as `/summarize`. Same response shape as `/summarize`.
+Request: none
+Response: same shape as `POST /api/meetings/{meeting_id}/summarize`
+
+---
+
+## Integrations — NEW, Google Calendar OAuth
+
+### GET /api/integrations/google/connect
+Redirects the browser to Google's consent screen. Not a JSON endpoint — the frontend navigates the browser here directly (e.g. `window.location = ...`), it isn't called via fetch.
+Response: `302 redirect` to Google
+
+### GET /api/integrations/google/callback
+Google redirects here after the user grants access. Not behind auth — `state` (the user's id, passed through the OAuth flow) is what identifies the user instead, since the browser won't have the app's auth header attached mid-redirect.
+Query params: `code`, `state`
+Response: `302 redirect` back to the app
+
+### POST /api/integrations/google/sync
+Pulls events from the user's connected Google Calendar and saves them as real Event rows. Falls back to `MockCalendarProvider` if the user hasn't connected Google yet, so this endpoint always works even before OAuth is set up.
+Request: `{ "context_id": str, "start_date": str, "end_date": str }`
+Response: `{ "synced_count": int }`
+
 ---
 
 ## Decisions
