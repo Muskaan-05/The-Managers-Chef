@@ -8,8 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database.base import Base
 
 
-class Context(Base):
-    __tablename__ = "contexts"
+class GoogleCredentials(Base):
+    __tablename__ = "google_credentials"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -19,20 +19,26 @@ class Context(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id"),
+        unique=True,
         nullable=False,
     )
 
-    name: Mapped[str] = mapped_column(
+    access_token: Mapped[str | None] = mapped_column(
         String,
-        nullable=False,
+        nullable=True,
     )
 
-    type: Mapped[str] = mapped_column(
+    refresh_token: Mapped[str | None] = mapped_column(
         String,
-        nullable=False,
+        nullable=True,
     )
 
-    created_at: Mapped[datetime] = mapped_column(
+    token_expiry: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    connected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
     )
