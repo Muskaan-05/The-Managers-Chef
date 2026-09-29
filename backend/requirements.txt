@@ -9,7 +9,7 @@ pydantic-settings
 # --- Database ---
 sqlalchemy
 alembic              # migrations
-psycopg2-binary      # PostgreSQL driver (sync). Use asyncpg instead if you go fully async.
+psycopg[binary]      # PostgreSQL driver with bundled binary libpq
 
 # --- Auth (Supabase) ---
 supabase             # Supabase Python client — handles auth + talks to your Postgres
