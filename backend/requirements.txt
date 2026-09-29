@@ -16,7 +16,7 @@ supabase             # Supabase Python client — handles auth + talks to your P
 python-jose[cryptography]   # only needed if you verify Supabase JWTs manually in FastAPI
 
 # --- AI / LLM ---
-anthropic            # swap for openai if you're using a different provider
+huggingface_hub           
 
 # --- Utilities ---
 python-dotenv        # load .env locally
