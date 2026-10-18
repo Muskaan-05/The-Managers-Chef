@@ -5,6 +5,41 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.reminder import Reminder
+from app.services.context_service import (
+    SOURCE_REMINDER,
+    upsert_context_item,
+    delete_context_items,
+)
+
+
+def _reminder_content(reminder: Reminder) -> str | None:
+    """Build searchable content for reminder only if it has free text beyond title and time."""
+    if not reminder.description or not reminder.description.strip():
+        return None
+    parts = [reminder.title, reminder.description]
+    return "\n".join(p.strip() for p in parts if p and p.strip())
+
+
+def mirror_reminder(db: Session, reminder: Reminder):
+    """Mirror one reminder record to context_items if it has free text. Does NOT commit."""
+    content = _reminder_content(reminder)
+    if not content:
+        delete_context_items(
+            db=db,
+            user_id=reminder.user_id,
+            source=SOURCE_REMINDER,
+            source_reference=reminder.id,
+        )
+        return None
+    return upsert_context_item(
+        db=db,
+        user_id=reminder.user_id,
+        source=SOURCE_REMINDER,
+        source_reference=reminder.id,
+        item_type="reminder",
+        content=content,
+        timestamp=reminder.trigger_time,
+    )
 
 
 def create_reminder(
@@ -29,6 +64,8 @@ def create_reminder(
     )
 
     db.add(reminder)
+    db.flush()
+    mirror_reminder(db, reminder)
     db.commit()
     db.refresh(reminder)
 
@@ -113,6 +150,7 @@ def update_reminder(
     description: str | None = None,
     trigger_time: datetime | None = None,
     recurrence: str | None = None,
+    status: str | None = None,
 ):
     reminder = get_reminder(db, user_id, reminder_id)
 
@@ -131,6 +169,10 @@ def update_reminder(
     if recurrence is not None:
         reminder.recurrence = recurrence
 
+    if status is not None:
+        reminder.status = status
+
+    mirror_reminder(db, reminder)
     db.commit()
     db.refresh(reminder)
 
@@ -147,6 +189,12 @@ def delete_reminder(
     if reminder is None:
         return False
 
+    delete_context_items(
+        db=db,
+        user_id=user_id,
+        source=SOURCE_REMINDER,
+        source_reference=reminder.id,
+    )
     db.delete(reminder)
     db.commit()
 

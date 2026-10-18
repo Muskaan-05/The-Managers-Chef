@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from datetime import timezone, datetime
 from sqlalchemy.orm import Session
 from typing import Optional
 from uuid import UUID
@@ -7,12 +8,15 @@ from app.database.session import get_db
 from app.auth.dependencies import get_current_user
 from app.models.user import User
 from app.models.context import Context
-from app.services.context_service import search_context
+from app.models.context_item import ContextItem
+from app.services.context_service import search_context, create_context_item
 from app.api.schemas.context_schema import (
     ContextCreate,
     ContextOut,
     ContextListOut,
     ContextSearchResultsOut,
+    ContextItemOut,
+    ContextItemCreate
 )
 
 router = APIRouter(prefix="/api/context", tags=["context"])
@@ -56,3 +60,24 @@ def search(
         db, current_user.id, q, item_type=type, context_id=context_id
     )
     return {"results": results}
+
+@router.post("/items", response_model=ContextItemOut)
+def create_context_items(
+    payload: ContextItemCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return create_context_item(
+            db=db,
+            user_id=current_user.id,
+            context_id=payload.context_id,
+            item_type=payload.type,
+            source=payload.source,
+            timestamp=payload.timestamp or datetime.now(timezone.utc),
+            content=payload.content,
+            source_reference=payload.source_reference,
+            item_metadata=payload.item_metadata,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

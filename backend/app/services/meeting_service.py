@@ -5,7 +5,110 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.context import Context
+from app.models.context_item import ContextItem
 from app.models.meeting import Meeting
+from app.services.context_service import (
+    SOURCE_MEETING,
+    upsert_context_item,
+    delete_context_items,
+)
+
+
+def _meeting_notes_content(meeting: Meeting) -> str:
+    """Build searchable content from meeting notes (title and summary)."""
+    parts = [meeting.title, meeting.summary]
+    return "\n".join(p.strip() for p in parts if p and p.strip())
+
+
+def _chunk_transcript(
+    transcript: str,
+    target_chars: int = 1000,
+    min_paras: int = 3,
+    max_paras: int = 5,
+) -> list[str]:
+    """
+    Split transcript into chunks of roughly 3 to 5 paragraphs
+    (or about 1000 characters, breaking on paragraph boundaries).
+    """
+    if not transcript or not transcript.strip():
+        return []
+
+    raw_paras = [p.strip() for p in transcript.split("\n\n") if p.strip()]
+    if len(raw_paras) <= 1 and "\n" in transcript:
+        raw_paras = [p.strip() for p in transcript.split("\n") if p.strip()]
+    if not raw_paras:
+        raw_paras = [transcript.strip()]
+
+    chunks = []
+    current_chunk: list[str] = []
+    current_len = 0
+
+    for p in raw_paras:
+        p_len = len(p)
+        if current_chunk and (
+            len(current_chunk) >= max_paras
+            or (len(current_chunk) >= min_paras and (current_len + p_len > target_chars))
+        ):
+            chunks.append("\n\n".join(current_chunk))
+            current_chunk = [p]
+            current_len = p_len
+        else:
+            current_chunk.append(p)
+            current_len += p_len + 2
+
+    if current_chunk:
+        chunks.append("\n\n".join(current_chunk))
+
+    return chunks
+
+
+def mirror_meeting_notes(db: Session, meeting: Meeting):
+    """Mirror meeting notes (title and summary) into context_items. Does NOT commit."""
+    content = _meeting_notes_content(meeting)
+    if not content:
+        return None
+    return upsert_context_item(
+        db=db,
+        user_id=meeting.user_id,
+        source=SOURCE_MEETING,
+        source_reference=meeting.id,
+        item_type="notes",
+        content=content,
+        context_id=meeting.context_id,
+        timestamp=meeting.start_time,
+    )
+
+
+def mirror_meeting_transcript(db: Session, meeting: Meeting):
+    """
+    Mirror meeting transcript into context_items as chunks. Does NOT commit.
+    Deletes existing transcript chunks first.
+    """
+    delete_context_items(
+        db=db,
+        user_id=meeting.user_id,
+        source=SOURCE_MEETING,
+        source_reference=meeting.id,
+        item_type="transcript",
+    )
+    if not meeting.transcript or not meeting.transcript.strip():
+        return []
+    chunks = _chunk_transcript(meeting.transcript)
+    items = []
+    for index, chunk in enumerate(chunks):
+        item = ContextItem(
+            user_id=meeting.user_id,
+            context_id=meeting.context_id,
+            type="transcript",
+            source=SOURCE_MEETING,
+            source_reference=meeting.id,
+            content=chunk,
+            item_metadata={"chunk": index},
+            timestamp=meeting.start_time,
+        )
+        db.add(item)
+        items.append(item)
+    return items
 
 
 def create_meeting(
@@ -46,6 +149,8 @@ def create_meeting(
     )
 
     db.add(meeting)
+    db.flush()
+    mirror_meeting_notes(db, meeting)
     db.commit()
     db.refresh(meeting)
 
@@ -134,6 +239,7 @@ def update_meeting(
     if status is not None:
         meeting.status = status
 
+    mirror_meeting_notes(db, meeting)
     db.commit()
     db.refresh(meeting)
 
@@ -160,6 +266,7 @@ def update_meeting_transcript(
         return None
 
     meeting.transcript = transcript
+    mirror_meeting_transcript(db, meeting)
 
     db.commit()
     db.refresh(meeting)
@@ -187,6 +294,7 @@ def update_meeting_summary(
         return None
 
     meeting.summary = summary
+    mirror_meeting_notes(db, meeting)
 
     db.commit()
     db.refresh(meeting)
@@ -248,6 +356,12 @@ def delete_meeting(
     if meeting is None:
         return False
 
+    delete_context_items(
+        db=db,
+        user_id=user_id,
+        source=SOURCE_MEETING,
+        source_reference=meeting.id,
+    )
     db.delete(meeting)
     db.commit()
 

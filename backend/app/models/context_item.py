@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func, Computed
 from sqlalchemy.dialects.postgresql import JSONB, UUID, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,6 +14,7 @@ class ContextItem(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
+        default=uuid.uuid4
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -46,6 +47,7 @@ class ContextItem(Base):
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
+        default=func.now(),
     )
 
     content: Mapped[str] = mapped_column(
@@ -61,7 +63,7 @@ class ContextItem(Base):
 
     search_vector: Mapped[str | None] = mapped_column(
         TSVECTOR,
-        nullable=True,
+        Computed("to_tsvector('english', content)", persisted=True),
     )
 
     __table_args__ = (

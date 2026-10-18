@@ -7,6 +7,31 @@ from sqlalchemy.orm import Session
 from app.models.context import Context
 from app.models.decision import Decision
 from app.models.meeting import Meeting
+from app.services.context_service import (
+    SOURCE_DECISION,
+    upsert_context_item,
+    delete_context_items,
+)
+
+
+def _decision_content(decision: Decision) -> str:
+    """Build searchable content from decision record."""
+    return decision.decision.strip()
+
+
+def mirror_decision(db: Session, decision: Decision):
+    """Mirror one decision record to context_items. Does NOT commit."""
+    return upsert_context_item(
+        db=db,
+        user_id=decision.user_id,
+        source=SOURCE_DECISION,
+        source_reference=decision.id,
+        item_type="decision",
+        content=_decision_content(decision),
+        context_id=decision.context_id,
+        item_metadata={"meeting_id": str(decision.meeting_id)} if decision.meeting_id else None,
+        timestamp=decision.created_at,
+    )
 
 
 def create_decision(
@@ -53,6 +78,8 @@ def create_decision(
     )
 
     db.add(new_decision)
+    db.flush()
+    mirror_decision(db, new_decision)
     db.commit()
     db.refresh(new_decision)
 
@@ -109,6 +136,33 @@ def list_decisions(
     return list(db.scalars(statement).all())
 
 
+def update_decision(
+    db: Session,
+    user_id: uuid.UUID,
+    decision_id: uuid.UUID,
+    decision_text: str | None = None,
+    context_id: uuid.UUID | None = None,
+) -> Decision | None:
+    """
+    Update a decision belonging to the authenticated user.
+    """
+    decision = get_decision(
+        db=db,
+        user_id=user_id,
+        decision_id=decision_id,
+    )
+    if decision is None:
+        return None
+    if decision_text is not None:
+        decision.decision = decision_text
+    if context_id is not None:
+        decision.context_id = context_id
+    mirror_decision(db, decision)
+    db.commit()
+    db.refresh(decision)
+    return decision
+
+
 def delete_decision(
     db: Session,
     user_id: uuid.UUID,
@@ -127,6 +181,12 @@ def delete_decision(
     if decision is None:
         return False
 
+    delete_context_items(
+        db=db,
+        user_id=user_id,
+        source=SOURCE_DECISION,
+        source_reference=decision.id,
+    )
     db.delete(decision)
     db.commit()
 

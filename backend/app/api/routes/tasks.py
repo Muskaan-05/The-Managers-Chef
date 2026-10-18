@@ -14,6 +14,13 @@ from app.api.schemas.task_schema import (
     TaskListOut,
 )
 
+from app.services.task_service import (
+    create_task as svc_create_task,
+    list_tasks as svc_list_tasks,
+    update_task as svc_update_task,
+    delete_task as svc_delete_task,
+)
+
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
 
@@ -25,12 +32,8 @@ def list_tasks(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Task).filter(Task.user_id == current_user.id)
-    if status:
-        q = q.filter(Task.status == status)
-    if context_id:
-        q = q.filter(Task.context_id == context_id)
-    return {"tasks": q.all()}
+    tasks = svc_list_tasks(db, current_user.id, status=status, context_id=context_id)
+    return {"tasks": tasks}
 
 
 @router.post("", response_model=TaskOut)
@@ -40,11 +43,11 @@ def create_task(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    task = Task(user_id=current_user.id, **payload.model_dump())
-    db.add(task)
-    db.commit()
-    db.refresh(task)
-    return task
+    return svc_create_task(
+        db=db,
+        user_id=current_user.id,
+        **payload.model_dump(),
+    )
 
 
 @router.patch("/{task_id}", response_model=TaskOut)
@@ -54,17 +57,14 @@ def update_task(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    task = (
-        db.query(Task)
-        .filter(Task.id == task_id, Task.user_id == current_user.id)
-        .first()
+    task = svc_update_task(
+        db=db,
+        user_id=current_user.id,
+        task_id=task_id,
+        updates=payload.model_dump(exclude_unset=True),
     )
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(task, field, value)
-    db.commit()
-    db.refresh(task)
     return task
 
 
@@ -74,13 +74,8 @@ def delete_task(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    task = (
-        db.query(Task)
-        .filter(Task.id == task_id, Task.user_id == current_user.id)
-        .first()
-    )
-    if not task:
+    success = svc_delete_task(db=db, user_id=current_user.id, task_id=task_id)
+    if not success:
         raise HTTPException(status_code=404, detail="Task not found")
-    db.delete(task)
-    db.commit()
     return None
+

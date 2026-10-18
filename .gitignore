@@ -2,3 +2,4 @@
 .venv/
 antigravity_context.txt
 __pycache__/
+backend/inspect_db.py

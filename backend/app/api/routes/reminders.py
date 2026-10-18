@@ -7,7 +7,12 @@ from app.database.session import get_db
 from app.auth.dependencies import get_current_user
 from app.models.user import User
 from app.models.reminder import Reminder
-from app.services.reminder_service import create_reminder
+from app.services.reminder_service import (
+    create_reminder,
+    list_reminders as svc_list_reminders,
+    update_reminder as svc_update_reminder,
+    delete_reminder as svc_delete_reminder,
+)
 from app.api.schemas.reminder_schema import (
     ReminderCreate,
     ReminderUpdate,
@@ -25,10 +30,8 @@ def list_reminders(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Reminder).filter(Reminder.user_id == current_user.id)
-    if status:
-        q = q.filter(Reminder.status == status)
-    return {"reminders": q.order_by(Reminder.trigger_time.asc()).all()}
+    reminders = svc_list_reminders(db, current_user.id, status=status)
+    return {"reminders": reminders}
 
 
 @router.post("", response_model=ReminderOut)
@@ -42,6 +45,7 @@ def create_reminder_route(
         db,
         user_id=current_user.id,
         title=payload.title,
+        description=payload.description,
         trigger_time=payload.trigger_time,
         recurrence=payload.recurrence,
         source="manual",
@@ -55,17 +59,25 @@ def update_reminder(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    reminder = (
-        db.query(Reminder)
-        .filter(
-            Reminder.id == reminder_id, Reminder.user_id == current_user.id
-        )
-        .first()
+    reminder = svc_update_reminder(
+        db=db,
+        user_id=current_user.id,
+        reminder_id=reminder_id,
+        **payload.model_dump(exclude_unset=True),
     )
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(reminder, field, value)
-    db.commit()
-    db.refresh(reminder)
     return reminder
+
+
+@router.delete("/{reminder_id}")
+def delete_reminder_route(
+    reminder_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    deleted = svc_delete_reminder(db=db, user_id=current_user.id, reminder_id=reminder_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    return {"deleted": True}
+
