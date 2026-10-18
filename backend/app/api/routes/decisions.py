@@ -6,7 +6,6 @@ from uuid import UUID
 from app.database.session import get_db
 from app.auth.dependencies import get_current_user
 from app.models.user import User
-from app.models.decision import Decision
 from app.services.decision_service import (
     create_decision,
     get_decisions_for_context,
