@@ -53,6 +53,6 @@ def search(
     db: Session = Depends(get_db),
 ):
     results = search_context(
-        db, current_user.id, q, type=type, context_id=context_id
+        db, current_user.id, q, item_type=type, context_id=context_id
     )
     return {"results": results}

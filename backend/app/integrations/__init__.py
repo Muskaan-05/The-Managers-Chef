@@ -1,11 +1,5 @@
-from app.integrations.base import (
-    CalendarProvider,
-    EmailProvider,
-    MessageProvider,
-)
-from app.integrations.mock_calendar import MockCalendarProvider
-from app.integrations.mock_email import MockEmailProvider
-from app.integrations.mock_message import MockMessageProvider
+from app.integrations.base import CalendarProvider
+from app.integrations.mock_calendar import MockCalendarProvider, mock_calendar_provider
 from app.integrations.google_calendar_provider import (
     GoogleCalendarProvider,
     get_authorization_url,

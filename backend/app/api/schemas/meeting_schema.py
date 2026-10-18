@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, AnyUrl, HttpUrl
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -8,6 +8,8 @@ class MeetingCreate(BaseModel):
     title: str
     start_time: datetime
     end_time: Optional[datetime] = None
+    meet_link: Optional[str] = None
+    status: Optional[str] = "scheduled"
     participants: Optional[List[str]] = []
     context_id: UUID
 

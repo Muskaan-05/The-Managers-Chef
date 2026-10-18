@@ -1,15 +1,18 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from datetime import date
+from typing import Optional
 
 from app.auth.dependencies import get_current_user
 from app.database.session import get_db
 from app.models.user import User
-from app.services.calendar_service import (
-    get_connect_url,
-    handle_oauth_callback,
-    sync_calendar_events,
+from app.integrations.google_calendar_provider import (
+    get_authorization_url,
+    exchange_code_for_tokens,
+    GoogleCalendarProvider,
 )
+from app.integrations.mock_calendar import mock_calendar_provider
 from app.api.schemas.integration_schema import (
     SyncCalendarRequest,
     SyncCalendarResponse,
@@ -20,12 +23,16 @@ router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
 @router.get("/google/connect")
 def connect_google(current_user: User = Depends(get_current_user)):
-    return RedirectResponse(get_connect_url(current_user.id))
+    url = get_authorization_url(str(current_user.id))
+    return RedirectResponse(url)
 
 
 @router.get("/google/callback")
 def google_callback(code: str, state: str, db: Session = Depends(get_db)):
-    handle_oauth_callback(db, user_id=state, code=code)
+    try:
+        exchange_code_for_tokens(db, user_id=state, code=code)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return RedirectResponse("/dashboard?calendar_connected=true")
 
 
@@ -35,11 +42,8 @@ def sync_calendar(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    events = sync_calendar_events(
-        db,
-        current_user.id,
-        payload.context_id,
-        payload.start_date,
-        payload.end_date,
-    )
+    # Use mock provider; replace with GoogleCalendarProvider when credentials available
+    start = payload.start_date or date.today()
+    end = payload.end_date or date.today()
+    events = mock_calendar_provider.get_events(current_user.id, start, end)
     return {"synced_count": len(events)}

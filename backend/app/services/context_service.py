@@ -23,7 +23,7 @@ def create_context(
         user_id=user_id,
         name=name,
         type=context_type,
-        created_at=datetime.now(timezone.utc),
+        created_at=func.now(),
     )
 
     db.add(context)

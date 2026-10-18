@@ -6,27 +6,53 @@ from app.auth.supabase_auth import get_supabase_client
 from app.database.session import get_db
 from app.models.user import User
 
+from datetime import datetime, timezone
+import uuid
+from sqlalchemy.exc import IntegrityError
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+bearer_scheme = HTTPBearer(auto_error=False)
 
 def get_current_user(
-    authorization: Optional[str] = Header(None),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail="Missing or invalid Authorization header"
-        )
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
 
-    token = authorization.replace("Bearer ", "").strip()
+    token = credentials.credentials
     try:
+        print("initiated client connection...")
         client = get_supabase_client()
-        supabase_user_resp = client.auth.get_user(token)
-        supabase_user = supabase_user_resp.user
-        if not supabase_user:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        supabase_user = client.auth.get_user(token).user
     except Exception:
+        print("AUTH ERROR:", repr(e))
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    if not supabase_user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    user = db.query(User).filter(User.id == supabase_user.id).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+    user_id = uuid.UUID(str(supabase_user.id))
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        return user
+
+    meta = supabase_user.user_metadata or {}
+    user = User(
+        id=user_id,
+        email=supabase_user.email,
+        name=meta.get("name") or (supabase_user.email or "").split("@")[0],
+        timezone=datetime.now(timezone.utc),
+    )
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError as e:  # another request created the row first
+        db.rollback()
+        print("INSERT FAILED:", e.orig)
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=500, detail="Could not create user")
+    else:
+        db.refresh(user)
     return user

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
@@ -7,7 +7,7 @@ from datetime import datetime
 class UserOut(BaseModel):
     id: UUID
     name: str
-    email: EmailStr
+    email: str
     timezone: str = "UTC"
     created_at: Optional[datetime] = None
 
@@ -17,13 +17,13 @@ class UserOut(BaseModel):
 
 class SignupRequest(BaseModel):
     name: str
-    email: EmailStr
+    email: str
     password: str
     timezone: str = "UTC"
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 

@@ -3,9 +3,9 @@ from supabase import create_client, Client
 from app.config import settings
 
 supabase: Optional[Client] = None
-if settings.SUPABASE_URL and settings.SUPABASE_KEY:
+if settings.SUPABASE_URL and settings.SUPABASE_PUBLISHABLE_KEY:
     try:
-        supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+        supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_PUBLISHABLE_KEY)
     except Exception:
         supabase = None
 
@@ -13,8 +13,8 @@ if settings.SUPABASE_URL and settings.SUPABASE_KEY:
 def get_supabase_client() -> Client:
     global supabase
     if supabase is None:
-        if settings.SUPABASE_URL and settings.SUPABASE_KEY:
-            supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+        if settings.SUPABASE_URL and settings.SUPABASE_PUBLISHABLE_KEY:
+            supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_PUBLISHABLE_KEY)
         else:
             raise RuntimeError(
                 "Supabase client is not configured. Set SUPABASE_URL and SUPABASE_KEY."
