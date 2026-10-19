@@ -1,0 +1,1325 @@
+/* ==========================================================================
+   The Manager's Chef — Memories Page Styling
+   Reuses exact design tokens, typography, borders, shadows & colors from Dashboard
+   ========================================================================== */
+
+/* Form Controls (mirrors tasks.css — used in Edit Memory modal) */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: #ffffff;
+  font-size: 13px;
+  color: var(--text-main);
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.form-textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+}
+
+
+.memories-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+/* ==========================================================================
+   1. Page Header Search Bar (prominent, centered focus)
+   ========================================================================== */
+.memories-search-hero {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.memories-search-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.memories-hero-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.memories-hero-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.2px;
+}
+
+.memories-hero-subtitle {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.memories-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.memories-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+
+.memories-stat-icon {
+  color: var(--text-subtle);
+}
+
+.memories-stat-value {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+/* Main Search Input */
+.memories-main-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.memories-main-search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-subtle);
+  pointer-events: none;
+}
+
+.memories-main-search-input {
+  width: 100%;
+  padding: 11px 44px 11px 44px;
+  background-color: var(--bg-app);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  font-size: 14px;
+  color: var(--text-main);
+  transition: all 0.15s ease;
+  outline: none;
+  font-family: inherit;
+}
+
+.memories-main-search-input:focus {
+  background-color: #ffffff;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+}
+
+.memories-main-search-input::placeholder {
+  color: var(--text-subtle);
+}
+
+.memories-main-search-clear {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: all 0.12s ease;
+}
+
+.memories-main-search-clear:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.memories-search-shortcut {
+  position: absolute;
+  right: 14px;
+  display: flex;
+  gap: 2px;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   2. Quick Filter & Sort Toolbar
+   ========================================================================== */
+.memories-toolbar {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: var(--shadow-subtle);
+}
+
+.memories-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.memories-filter-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.memories-filter-tab-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.memories-filter-tab-btn.active {
+  background-color: var(--accent-primary-light);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary-border);
+  font-weight: 600;
+}
+
+.memories-filter-count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--border-light);
+  color: var(--text-muted);
+}
+
+.memories-filter-tab-btn.active .memories-filter-count {
+  background-color: rgba(79, 70, 229, 0.15);
+  color: var(--accent-primary);
+}
+
+.memories-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.memories-sort-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.memories-sort-select {
+  padding: 6px 10px;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  color: var(--text-main);
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.memories-sort-select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+}
+
+/* ==========================================================================
+   3. Memory Cards List
+   ========================================================================== */
+.memories-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memories-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.memories-list-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-subtle);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.memories-list-count {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background-color: var(--border-light);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  padding: 1px 8px;
+}
+
+/* Memory Card */
+.memory-item-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  position: relative;
+  cursor: pointer;
+}
+
+.memory-item-card:hover {
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-elevated);
+}
+
+.memory-item-card.is-pinned {
+  border-left: 3.5px solid var(--accent-primary);
+}
+
+/* Card Header Row */
+.memory-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.memory-item-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.memory-item-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+/* Category badge reuse */
+.memory-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+
+.memory-cat-meeting {
+  background-color: var(--badge-indigo-bg);
+  color: var(--badge-indigo-text);
+  border-color: var(--badge-indigo-border);
+}
+
+.memory-cat-decision {
+  background-color: var(--badge-emerald-bg);
+  color: var(--badge-emerald-text);
+  border-color: var(--badge-emerald-border);
+}
+
+.memory-cat-task {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-text);
+  border-color: var(--badge-amber-border);
+}
+
+.memory-cat-client {
+  background-color: var(--badge-rose-bg);
+  color: var(--badge-rose-text);
+  border-color: var(--badge-rose-border);
+}
+
+.memory-cat-project {
+  background-color: var(--badge-slate-bg);
+  color: var(--badge-slate-text);
+  border-color: var(--badge-slate-border);
+}
+
+.memory-cat-policy {
+  background-color: var(--badge-indigo-bg);
+  color: var(--badge-indigo-text);
+  border-color: var(--badge-indigo-border);
+}
+
+.memory-cat-operations {
+  background-color: var(--badge-slate-bg);
+  color: var(--badge-slate-text);
+  border-color: var(--badge-slate-border);
+}
+
+.memory-cat-commitment {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-text);
+  border-color: var(--badge-amber-border);
+}
+
+.memory-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.memory-date-icon {
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+
+.memory-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-body);
+  background-color: var(--bg-card-subtle);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.memory-source-icon {
+  color: var(--text-subtle);
+}
+
+.memory-item-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.2px;
+  line-height: 1.3;
+}
+
+/* Card Actions Header Right */
+.memory-item-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.memory-pin-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.memory-pin-btn:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-subtle);
+  color: var(--text-main);
+}
+
+.memory-pin-btn.pinned {
+  color: var(--accent-primary);
+  background-color: var(--accent-primary-light);
+  border-color: var(--accent-primary-border);
+}
+
+.memory-action-menu-trigger {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.memory-action-menu-trigger:hover,
+.memory-action-menu-trigger.active {
+  background-color: var(--bg-hover);
+  border-color: var(--border-subtle);
+  color: var(--text-main);
+}
+
+/* Card Body */
+.memory-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memory-item-summary {
+  font-size: 13px;
+  color: var(--text-body);
+  line-height: 1.55;
+  background-color: var(--bg-card-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+}
+
+/* Context Pills row */
+.memory-context-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.memory-context-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 2px;
+}
+
+.memory-context-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-body);
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.memory-context-pill-icon {
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+
+/* Card Footer */
+.memory-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+}
+
+.memory-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.memory-related-person {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.memory-person-icon {
+  color: var(--text-subtle);
+}
+
+.memory-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-view-memory {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background-color: var(--accent-primary-light);
+  border: 1px solid var(--accent-primary-border);
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-view-memory:hover {
+  background-color: #e0e7ff;
+}
+
+.btn-related-task {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-body);
+  background-color: #ffffff;
+  border: 1px solid var(--border-subtle);
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-related-task:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-focus);
+}
+
+/* Dropdown Menu */
+.memory-dropdown-menu {
+  position: absolute;
+  top: 52px;
+  right: 16px;
+  width: 200px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-elevated);
+  padding: 4px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.memory-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-body);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  font-family: inherit;
+}
+
+.memory-dropdown-item:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.memory-dropdown-item.item-danger {
+  color: var(--badge-rose-text);
+}
+
+.memory-dropdown-item.item-danger:hover {
+  background-color: var(--badge-rose-bg);
+}
+
+.memory-dropdown-divider {
+  height: 1px;
+  background-color: var(--border-light);
+  margin: 4px 0;
+}
+
+/* ==========================================================================
+   4. Empty State
+   ========================================================================== */
+.memories-empty-state {
+  background-color: var(--bg-card);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 52px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-subtle);
+}
+
+.memories-empty-icon {
+  color: var(--text-subtle);
+  margin-bottom: 4px;
+}
+
+.memories-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.memories-empty-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 360px;
+  line-height: 1.45;
+}
+
+.memories-empty-btn {
+  margin-top: 8px;
+  padding: 7px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background-color: var(--accent-primary-light);
+  border: 1px solid var(--accent-primary-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.memories-empty-btn:hover {
+  background-color: #e0e7ff;
+}
+
+/* ==========================================================================
+   5. Memory Detail Modal
+   ========================================================================== */
+.memory-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: memoryModalFadeIn 0.15s ease-out;
+}
+
+@keyframes memoryModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.memory-modal-dialog {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
+  width: 100%;
+  max-width: 700px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: memoryModalSlideUp 0.18s ease-out;
+}
+
+@keyframes memoryModalSlideUp {
+  from { transform: translateY(14px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.memory-modal-header {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.memory-modal-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.memory-modal-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.memory-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.3px;
+  line-height: 1.25;
+}
+
+.memory-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.memory-modal-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s ease;
+}
+
+.memory-modal-close-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.memory-modal-pin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background-color: #ffffff;
+  color: var(--text-body);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.memory-modal-pin-btn:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-focus);
+}
+
+.memory-modal-pin-btn.pinned {
+  color: var(--accent-primary);
+  background-color: var(--accent-primary-light);
+  border-color: var(--accent-primary-border);
+}
+
+/* Modal Body */
+.memory-modal-body {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Detail Section Blocks */
+.memory-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memory-detail-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.memory-detail-content-box {
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text-body);
+  line-height: 1.55;
+}
+
+.memory-detail-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.memory-detail-info-item {
+  background-color: var(--bg-card-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.memory-detail-info-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.memory-detail-info-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* People list */
+.memory-people-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.memory-person-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-body);
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+}
+
+/* Related Context Section */
+.memory-related-context {
+  background-color: var(--bg-card-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memory-related-context-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: -0.1px;
+}
+
+.memory-related-context-icon {
+  color: var(--accent-primary);
+}
+
+.memory-related-items {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.memory-related-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.memory-related-item:hover {
+  border-color: var(--accent-primary-border);
+  background-color: var(--accent-primary-light);
+}
+
+.memory-related-item-icon-box {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.related-icon-meeting {
+  background-color: var(--badge-indigo-bg);
+  color: var(--badge-indigo-text);
+  border: 1px solid var(--badge-indigo-border);
+}
+
+.related-icon-task {
+  background-color: var(--badge-amber-bg);
+  color: var(--badge-amber-text);
+  border: 1px solid var(--badge-amber-border);
+}
+
+.related-icon-decision {
+  background-color: var(--badge-emerald-bg);
+  color: var(--badge-emerald-text);
+  border: 1px solid var(--badge-emerald-border);
+}
+
+.memory-related-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.memory-related-item-type {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.memory-related-item-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memory-related-item-arrow {
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+
+/* Decision list */
+.memory-decisions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.memory-decision-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background-color: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  color: var(--text-main);
+  line-height: 1.4;
+}
+
+.memory-decision-icon {
+  color: var(--badge-emerald-text);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Modal Footer */
+.memory-modal-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--border-light);
+  background-color: var(--bg-card-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.memory-modal-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.memory-modal-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-modal-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-body);
+  background-color: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-modal-edit:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-focus);
+}
+
+.btn-modal-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--badge-rose-text);
+  background-color: #ffffff;
+  border: 1px solid var(--badge-rose-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-modal-delete:hover {
+  background-color: var(--badge-rose-bg);
+}
+
+.btn-modal-meeting {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-body);
+  background-color: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-modal-meeting:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-focus);
+}
+
+.btn-modal-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: var(--accent-primary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-modal-primary:hover {
+  background-color: #4338ca;
+}
+
+/* ==========================================================================
+   6. Delete Confirm Modal
+   ========================================================================== */
+.memory-delete-modal-dialog {
+  max-width: 440px;
+}
+
+.memory-delete-warning-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background-color: var(--badge-rose-bg);
+  border: 1px solid var(--badge-rose-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--badge-rose-text);
+  line-height: 1.45;
+}
+
+.memory-delete-warning-icon {
+  color: var(--badge-rose-text);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ==========================================================================
+   7. Edit Modal
+   ========================================================================== */
+.memory-edit-modal-dialog {
+  max-width: 560px;
+}
+
+/* ==========================================================================
+   8. Toast
+   ========================================================================== */
+.memories-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background-color: var(--text-main);
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-elevated);
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: memToastPop 0.2s ease-out;
+}
+
+@keyframes memToastPop {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ==========================================================================
+   Responsive Adjustments
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .memory-detail-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .memories-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .memories-toolbar-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .memory-item-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .memory-item-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .memory-modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .memory-modal-footer-left,
+  .memory-modal-footer-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 520px) {
+  .memories-filter-tabs {
+    width: 100%;
+  }
+
+  .memories-filter-tab-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .memories-search-hero {
+    padding: 16px;
+  }
+
+  .memories-stats-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .memory-detail-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
