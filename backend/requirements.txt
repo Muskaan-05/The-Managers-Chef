@@ -25,3 +25,10 @@ python-multipart     # needed if any endpoint accepts file/form uploads (e.g. tr
 # --- Testing ---
 pytest
 httpx                # FastAPI's TestClient dependency, also used for async test requests
+
+# --- Google Calendar & OAuth ---
+google-auth
+google-auth-oauthlib
+google-api-python-client
+itsdangerous
+

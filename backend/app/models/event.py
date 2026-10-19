@@ -59,6 +59,11 @@ class Event(Base):
         nullable=True,
     )
 
+    google_event_id: Mapped[str | None] = mapped_column(
+        String, 
+        nullable=True
+    )
+
     source: Mapped[str] = mapped_column(
         String,
         nullable=False,

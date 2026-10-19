@@ -6,65 +6,53 @@ from app.integrations.base import CalendarProvider
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
-def get_authorization_url(state: str) -> str:
-    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
-        return f"https://accounts.google.com/o/oauth2/auth?client_id=mock_client_id&redirect_uri={settings.GOOGLE_REDIRECT_URI}&response_type=code&scope={'%20'.join(SCOPES)}&state={state}&access_type=offline&prompt=consent"
-    try:
-        from google_auth_oauthlib.flow import Flow
+def get_oauth_flow(autogenerate_code_verifier: bool = False):
+    """Build a Google OAuth Flow using project settings."""
+    from google_auth_oauthlib.flow import Flow
 
-        flow = Flow.from_client_config(
-            {
-                "web": {
-                    "client_id": settings.GOOGLE_CLIENT_ID,
-                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": [settings.GOOGLE_REDIRECT_URI],
-                }
-            },
-            scopes=SCOPES,
-        )
-        flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
-        auth_url, _ = flow.authorization_url(
-            access_type="offline", state=state, prompt="consent"
-        )
-        return auth_url
-    except Exception:
-        return f"https://accounts.google.com/o/oauth2/auth?client_id={settings.GOOGLE_CLIENT_ID}&redirect_uri={settings.GOOGLE_REDIRECT_URI}&response_type=code&scope={'%20'.join(SCOPES)}&state={state}&access_type=offline&prompt=consent"
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise ValueError("Google OAuth credentials are not configured in settings")
+
+    client_config = {
+        "web": {
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [settings.GOOGLE_REDIRECT_URI],
+        }
+    }
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=SCOPES,
+        autogenerate_code_verifier=autogenerate_code_verifier,
+    )
+    flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
+    return flow
+
+
+def get_authorization_url(state: str) -> str:
+    """Generate the Google OAuth consent URL with offline access and prompt=consent."""
+    flow = get_oauth_flow(autogenerate_code_verifier=False)
+    auth_url, _ = flow.authorization_url(
+        access_type="offline",
+        prompt="consent",
+        include_granted_scopes="true",
+        state=state,
+    )
+    return auth_url
 
 
 def exchange_code_for_tokens(code: str) -> dict:
-    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
-        return {
-            "access_token": f"mock_access_token_{code}",
-            "refresh_token": f"mock_refresh_token_{code}",
-            "token_expiry": None,
-        }
-    try:
-        from google_auth_oauthlib.flow import Flow
-
-        flow = Flow.from_client_config(
-            {
-                "web": {
-                    "client_id": settings.GOOGLE_CLIENT_ID,
-                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": [settings.GOOGLE_REDIRECT_URI],
-                }
-            },
-            scopes=SCOPES,
-        )
-        flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
-        flow.fetch_token(code=code)
-        creds = flow.credentials
-        return {
-            "access_token": creds.token,
-            "refresh_token": creds.refresh_token,
-            "token_expiry": creds.expiry,
-        }
-    except Exception as e:
-        raise RuntimeError(f"Failed to exchange code for tokens: {e}")
+    """Exchange authorization code for access and refresh tokens."""
+    flow = get_oauth_flow(autogenerate_code_verifier=False)
+    flow.fetch_token(code=code)
+    creds = flow.credentials
+    return {
+        "access_token": creds.token,
+        "refresh_token": creds.refresh_token,
+        "token_expiry": creds.expiry,
+    }
 
 
 class GoogleCalendarProvider(CalendarProvider):

@@ -23,11 +23,14 @@ engine = create_engine(TEST_DATABASE_URL)
 TestSessionLocal = sessionmaker(bind=engine)
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session", autouse=False)
 def setup_test_database():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
+    if os.getenv("TEST_DATABASE_URL"):
+        Base.metadata.create_all(bind=engine)
+        yield
+        Base.metadata.drop_all(bind=engine)
+    else:
+        yield
 
 
 @pytest.fixture
