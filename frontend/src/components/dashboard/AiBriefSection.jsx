@@ -41,27 +41,36 @@ export default function AiBriefSection({ items = [] }) {
       </div>
 
       <div className="ai-brief-items-grid">
-        {items.map((item) => (
-          <div 
-            key={item.id} 
-            className={`ai-brief-item ${item.isHighPriority ? 'item-high-priority' : ''}`}
-          >
-            <div className="brief-item-header">
-              <span className={`brief-category-pill pill-${item.badgeColor}`}>
-                {getItemIcon(item.type)}
-                {item.badgeLabel}
-              </span>
-              <span className="brief-time-indicator">
-                <Clock size={12} className="brief-clock-icon" />
-                {item.timeLabel}
-              </span>
-            </div>
-
-            <h3 className="brief-item-title">{item.title}</h3>
-            <p className="brief-item-desc">{item.description}</p>
+        {items.length === 0 ? (
+          <div style={{ gridColumn: '1 / -1', padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13.5px' }}>
+            <CheckCircle2 size={28} style={{ margin: '0 auto 8px', color: '#10b981' }} />
+            <p style={{ fontWeight: 500, color: 'var(--text-main)', marginBottom: '4px' }}>All caught up for today!</p>
+            <p>No critical action items or pending alerts require immediate attention.</p>
           </div>
-        ))}
+        ) : (
+          items.map((item) => (
+            <div 
+              key={item.id} 
+              className={`ai-brief-item ${item.isHighPriority ? 'item-high-priority' : ''}`}
+            >
+              <div className="brief-item-header">
+                <span className={`brief-category-pill pill-${item.badgeColor}`}>
+                  {getItemIcon(item.type)}
+                  {item.badgeLabel}
+                </span>
+                <span className="brief-time-indicator">
+                  <Clock size={12} className="brief-clock-icon" />
+                  {item.timeLabel}
+                </span>
+              </div>
+
+              <h3 className="brief-item-title">{item.title}</h3>
+              <p className="brief-item-desc">{item.description}</p>
+            </div>
+          ))
+        )}
       </div>
     </section>
   );
 }
+

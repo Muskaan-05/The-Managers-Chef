@@ -25,9 +25,10 @@ def get_current_user(
         print("initiated client connection...")
         client = get_supabase_client()
         supabase_user = client.auth.get_user(token).user
-    except Exception:
+    except Exception as e:
         print("AUTH ERROR:", repr(e))
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
     
     if not supabase_user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -42,8 +43,9 @@ def get_current_user(
         id=user_id,
         email=supabase_user.email,
         name=meta.get("name") or (supabase_user.email or "").split("@")[0],
-        timezone=datetime.now(timezone.utc),
+        timezone=meta.get("timezone") or "UTC",
     )
+
     db.add(user)
     try:
         db.commit()

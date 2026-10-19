@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import MeetingSummary from './MeetingSummary';
 import MeetingFilterBar from './MeetingFilterBar';
 import MeetingList from './MeetingList';
@@ -6,8 +6,21 @@ import MeetingDetailModal from './MeetingDetailModal';
 import ScheduleMeetingModal from './ScheduleMeetingModal';
 import CreateFollowUpTaskModal from './CreateFollowUpTaskModal';
 import JoinMeetingModal from '../tasks/JoinMeetingModal';
-import { mockInitialMeetings } from '../../data/mockData';
-import { Check } from 'lucide-react';
+import { 
+  getMeetings, 
+  createMeeting, 
+  deleteMeeting, 
+  getEvents, 
+  deleteEvent, 
+  createTask, 
+  ensureDefaultContext,
+  getDecisions,
+  createDecision,
+  submitMeetingTranscript,
+  joinMeeting
+} from '../../services/api';
+import { formatDisplayDate, parseMeetingTimes } from '../../utils/dateUtils';
+import { Check, RefreshCw, AlertCircle } from 'lucide-react';
 import '../../styles/meetings.css';
 
 export default function MeetingsView({
@@ -15,15 +28,9 @@ export default function MeetingsView({
   setIsScheduleModalOpen,
   onMeetingsCountChange
 }) {
-  const [meetings, setMeetings] = useState(() => {
-    try {
-      const saved = localStorage.getItem('tmc_manager_meetings');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      // ignore
-    }
-    return mockInitialMeetings;
-  });
+  const [meetings, setMeetings] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,15 +48,125 @@ export default function MeetingsView({
     if (setIsScheduleModalOpen) setIsScheduleModalOpen(false);
   };
 
-  // Sync meetings to localStorage
-  useEffect(() => {
+  // Map backend meeting record to frontend display model
+  const mapBackendMeeting = useCallback((m) => {
+    const start = m.start_time ? new Date(m.start_time) : new Date();
+    const end = m.end_time ? new Date(m.end_time) : new Date(start.getTime() + 45 * 60 * 1000);
+    const now = new Date();
+    const isToday = start.toDateString() === now.toDateString();
+    const isCompleted = end < now;
+    const computedStatus = isCompleted ? 'completed' : (isToday ? 'today' : 'upcoming');
+
+    const formattedStart = formatDisplayDate(m.start_time);
+    const timeOnly = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + 
+      (m.end_time ? ` - ${end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '');
+
+    return {
+      id: m.id,
+      title: m.title,
+      clientProject: 'General',
+      meetingType: m.bot_process_id ? 'AI Monitored' : 'Team Sync',
+      date: isToday ? 'Today' : start.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+      time: timeOnly,
+      timeLabel: `${formattedStart} (${m.status || 'scheduled'})`,
+      participants: m.participants || [],
+      location: m.meet_link ? 'Google Meet' : 'Meeting Room',
+      meetingLink: m.meet_link || '',
+      status: computedStatus,
+      rawStatus: m.status,
+      needsFollowUp: false,
+      agenda: m.summary || m.transcript || 'Review milestones and sync on updates.',
+      previousContext: m.summary ? `Summary: ${m.summary.slice(0, 150)}...` : '',
+      relatedMemories: [],
+      relatedTasks: [],
+      notes: m.transcript || '',
+      keyDecisions: [],
+      actionItems: [],
+      isEvent: false,
+      context_id: m.context_id,
+      bot_process_id: m.bot_process_id,
+    };
+  }, []);
+
+  // Map backend event record (e.g. from Google Calendar) to frontend display model
+  const mapBackendEvent = useCallback((e) => {
+    const start = e.start_time ? new Date(e.start_time) : new Date();
+    const end = e.end_time ? new Date(e.end_time) : new Date(start.getTime() + 30 * 60 * 1000);
+    const now = new Date();
+    const isToday = start.toDateString() === now.toDateString();
+    const isCompleted = end < now;
+    const computedStatus = isCompleted ? 'completed' : (isToday ? 'today' : 'upcoming');
+
+    const isGoogle = e.source === 'google_calendar';
+    const formattedStart = formatDisplayDate(e.start_time);
+    const timeOnly = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+    return {
+      id: e.id,
+      title: e.title,
+      clientProject: isGoogle ? 'Google Calendar' : 'General',
+      meetingType: isGoogle ? 'Google Event' : 'Calendar Event',
+      date: isToday ? 'Today' : start.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+      time: timeOnly,
+      timeLabel: `${formattedStart} · ${isGoogle ? 'Google Calendar' : 'Calendar Event'}`,
+      participants: e.participants || [],
+      location: e.location || (isGoogle ? 'Google Calendar' : 'Calendar'),
+      meetingLink: (e.location && e.location.startsWith('http')) ? e.location : '',
+      status: computedStatus,
+      rawStatus: 'scheduled',
+      needsFollowUp: false,
+      agenda: e.description || 'Calendar schedule event.',
+      previousContext: isGoogle ? 'Imported from Google Calendar' : '',
+      relatedMemories: [],
+      relatedTasks: [],
+      notes: e.description || '',
+      keyDecisions: [],
+      actionItems: [],
+      isEvent: true,
+      context_id: e.context_id,
+      source: e.source,
+      google_event_id: e.google_event_id,
+    };
+  }, []);
+
+  // Fetch all meetings and calendar events
+  const fetchMeetingsAndEvents = useCallback(async () => {
     try {
-      localStorage.setItem('tmc_manager_meetings', JSON.stringify(meetings));
-    } catch (e) {
-      // ignore
+      setIsLoading(true);
+      setError(null);
+      const [meetingsData, eventsData] = await Promise.all([
+        getMeetings().catch(() => []),
+        getEvents().catch(() => []),
+      ]);
+
+      const mappedMeetings = (meetingsData || []).map(mapBackendMeeting);
+      const mappedEvents = (eventsData || []).map(mapBackendEvent);
+
+      // Combine and sort chronologically
+      const combined = [...mappedMeetings, ...mappedEvents];
+      combined.sort((a, b) => {
+        const timeA = a.rawMeeting?.start_time || a.rawEvent?.start_time || a.timeLabel;
+        const timeB = b.rawMeeting?.start_time || b.rawEvent?.start_time || b.timeLabel;
+        return String(timeA).localeCompare(String(timeB));
+      });
+
+      setMeetings(combined);
+    } catch (err) {
+      console.error('Failed to load meetings:', err);
+      setError(err.message || 'Failed to load meetings from server');
+    } finally {
+      setIsLoading(false);
     }
+  }, [mapBackendMeeting, mapBackendEvent]);
+
+  useEffect(() => {
+    fetchMeetingsAndEvents();
+  }, [fetchMeetingsAndEvents]);
+
+  // Update badge count
+  useEffect(() => {
     if (onMeetingsCountChange) {
-      const todayOrUpcoming = meetings.filter(m => m.status === 'today' || m.status === 'upcoming').length;
+      const todayOrUpcoming = meetings.filter((m) => m.status === 'today' || m.status === 'upcoming').length;
       onMeetingsCountChange(todayOrUpcoming);
     }
   }, [meetings, onMeetingsCountChange]);
@@ -75,7 +192,6 @@ export default function MeetingsView({
   // Filter & Search meetings
   const filteredMeetings = useMemo(() => {
     return meetings.filter((m) => {
-      // 1. Status Filter
       if (activeFilter === 'today' && m.status !== 'today') {
         return false;
       }
@@ -89,7 +205,6 @@ export default function MeetingsView({
         return false;
       }
 
-      // 2. Search Query (title, clientProject, meetingType, participants)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const matchesTitle = m.title.toLowerCase().includes(q);
@@ -103,11 +218,49 @@ export default function MeetingsView({
     });
   }, [meetings, activeFilter, searchQuery]);
 
-  // Handlers
-  const handleScheduleMeeting = (newMeeting) => {
-    setMeetings((prev) => [newMeeting, ...prev]);
-    closeScheduleModal();
-    showToast(`Meeting "${newMeeting.title}" scheduled.`);
+  // Schedule a new meeting
+  const handleScheduleMeeting = async (meetingFormData) => {
+    try {
+      const contextId = await ensureDefaultContext();
+      const { startTimeISO, endTimeISO } = parseMeetingTimes(meetingFormData.date, meetingFormData.time);
+
+      await createMeeting({
+        title: meetingFormData.title,
+        start_time: startTimeISO,
+        end_time: endTimeISO,
+        meet_link: meetingFormData.meetingLink,
+        status: 'scheduled',
+        participants: meetingFormData.participants || [],
+        context_id: contextId,
+      });
+
+      closeScheduleModal();
+      showToast('Meeting scheduled successfully.');
+      await fetchMeetingsAndEvents();
+    } catch (err) {
+      showToast(`Error: ${err.message || 'Failed to schedule meeting'}`);
+    }
+  };
+
+  // Delete meeting or event
+  const handleDeleteMeeting = async (item) => {
+    if (!window.confirm(`Are you sure you want to delete "${item.title}"?`)) {
+      return;
+    }
+    try {
+      if (item.isEvent) {
+        await deleteEvent(item.id);
+      } else {
+        await deleteMeeting(item.id);
+      }
+      setMeetings((prev) => prev.filter((m) => m.id !== item.id));
+      if (selectedDetailMeeting && selectedDetailMeeting.id === item.id) {
+        setSelectedDetailMeeting(null);
+      }
+      showToast(`"${item.title}" deleted.`);
+    } catch (err) {
+      showToast(`Error: ${err.message || 'Failed to delete meeting'}`);
+    }
   };
 
   const handleToggleFollowUp = (meeting) => {
@@ -121,46 +274,53 @@ export default function MeetingsView({
     showToast(updatedStatus ? `Marked "${meeting.title}" for follow-up.` : `Follow-up flag removed.`);
   };
 
-  const handleSaveMeetingNotes = (meetingId, notesData) => {
-    setMeetings((prev) =>
-      prev.map((m) => (m.id === meetingId ? { ...m, ...notesData } : m))
-    );
-    if (selectedDetailMeeting && selectedDetailMeeting.id === meetingId) {
-      setSelectedDetailMeeting((prev) => ({ ...prev, ...notesData }));
+  const handleSaveMeetingNotes = async (meetingId, notesData) => {
+    try {
+      const target = meetings.find((m) => m.id === meetingId);
+      if (target && !target.isEvent && notesData.notes) {
+        await submitMeetingTranscript(meetingId, notesData.notes);
+      }
+      setMeetings((prev) =>
+        prev.map((m) => (m.id === meetingId ? { ...m, ...notesData } : m))
+      );
+      if (selectedDetailMeeting && selectedDetailMeeting.id === meetingId) {
+        setSelectedDetailMeeting((prev) => ({ ...prev, ...notesData }));
+      }
+      showToast('Meeting notes & decisions saved.');
+    } catch (err) {
+      showToast(`Saved locally: ${err.message}`);
     }
-    showToast('Meeting notes & decisions saved.');
   };
 
-  const handleCreateFollowUpTask = (meetingId, newTask) => {
-    // 1. Update meeting's relatedTasks
-    setMeetings((prev) =>
-      prev.map((m) => {
-        if (m.id === meetingId) {
-          const updatedRelatedTasks = [...(m.relatedTasks || []), newTask];
-          return {
-            ...m,
-            relatedTasks: updatedRelatedTasks,
-          };
-        }
-        return m;
-      })
-    );
-
-    // 2. Persist to tmc_manager_tasks so it appears on Tasks page as well
+  const handleCreateFollowUpTask = async (meetingId, newTask) => {
     try {
-      const existingTasksStr = localStorage.getItem('tmc_manager_tasks');
-      let currentTasks = [];
-      if (existingTasksStr) {
-        currentTasks = JSON.parse(existingTasksStr);
-      }
-      const updatedTasks = [newTask, ...currentTasks];
-      localStorage.setItem('tmc_manager_tasks', JSON.stringify(updatedTasks));
-    } catch (e) {
-      // ignore
-    }
+      const contextId = await ensureDefaultContext();
+      await createTask({
+        title: newTask.title,
+        description: newTask.description || `Follow-up from meeting`,
+        priority: newTask.priority || 'high',
+        deadline: parseMeetingTimes('Today', '05:00 PM').startTimeISO,
+        context_id: contextId,
+      });
 
-    setFollowUpTaskMeeting(null);
-    showToast(`Follow-up task created and added to Tasks queue.`);
+      setMeetings((prev) =>
+        prev.map((m) => {
+          if (m.id === meetingId) {
+            const updatedRelatedTasks = [...(m.relatedTasks || []), newTask];
+            return {
+              ...m,
+              relatedTasks: updatedRelatedTasks,
+            };
+          }
+          return m;
+        })
+      );
+
+      setFollowUpTaskMeeting(null);
+      showToast(`Follow-up task created in your Tasks queue.`);
+    } catch (err) {
+      showToast(`Error creating task: ${err.message}`);
+    }
   };
 
   const handleResetFilters = () => {
@@ -172,7 +332,40 @@ export default function MeetingsView({
 
   return (
     <div className="meetings-container">
-      {/* 3. Meeting Summary (Compact, minimal) */}
+      {error && (
+        <div style={{
+          padding: '12px 16px',
+          background: 'var(--badge-rose-bg)',
+          color: 'var(--badge-rose-text)',
+          border: '1px solid var(--badge-rose-border)',
+          borderRadius: 'var(--radius-md)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '13.5px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={fetchMeetingsAndEvents}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'inherit',
+              cursor: 'pointer',
+              fontWeight: 600,
+              textDecoration: 'underline'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Meeting Summary */}
       <MeetingSummary
         meetings={meetings}
         activeFilter={activeFilter}
@@ -188,19 +381,26 @@ export default function MeetingsView({
         counts={counts}
       />
 
-      {/* 4. Upcoming / Filtered Meetings List */}
-      <MeetingList
-        meetings={filteredMeetings}
-        onJoinMeeting={(meeting) => setJoiningMeeting(meeting)}
-        onViewDetails={(meeting) => setSelectedDetailMeeting(meeting)}
-        onToggleFollowUp={handleToggleFollowUp}
-        onCreateFollowUpTask={(meeting) => setFollowUpTaskMeeting(meeting)}
-        onResetFilters={handleResetFilters}
-        onScheduleMeeting={() => setLocalScheduleOpen(true)}
-        isFiltered={isFiltered}
-      />
+      {/* Upcoming / Filtered Meetings List */}
+      {isLoading ? (
+        <div className="task-table-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <RefreshCw size={24} className="spin-icon" style={{ margin: '0 auto 12px' }} />
+          <p>Loading meetings and calendar events...</p>
+        </div>
+      ) : (
+        <MeetingList
+          meetings={filteredMeetings}
+          onJoinMeeting={(meeting) => setJoiningMeeting(meeting)}
+          onViewDetails={(meeting) => setSelectedDetailMeeting(meeting)}
+          onToggleFollowUp={handleToggleFollowUp}
+          onCreateFollowUpTask={(meeting) => setFollowUpTaskMeeting(meeting)}
+          onDeleteMeeting={handleDeleteMeeting}
+          onResetFilters={handleResetFilters}
+          onScheduleMeeting={() => setLocalScheduleOpen(true)}
+          isFiltered={isFiltered}
+        />
+      )}
 
-      {/* Modals */}
       {/* Schedule Meeting Modal */}
       <ScheduleMeetingModal
         isOpen={isScheduleOpen}

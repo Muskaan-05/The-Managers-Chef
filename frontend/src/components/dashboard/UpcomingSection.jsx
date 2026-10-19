@@ -24,43 +24,52 @@ export default function UpcomingSection({ items = [] }) {
         </div>
       </div>
 
-      <div className="upcoming-timeline">
-        {items.map((item, index) => {
-          const isFirst = index === 0;
-          return (
-            <div 
-              key={item.id} 
-              className={`timeline-item ${isFirst ? 'timeline-item-current' : ''}`}
-            >
-              <div className="timeline-time-col">
-                <span className="timeline-time">{item.time}</span>
-                <span className="timeline-duration">{item.duration}</span>
-              </div>
-
-              <div className="timeline-node-col">
-                <div className={`timeline-dot dot-${item.status}`}>
-                  {getItemIcon(item.type)}
+      {items.length === 0 ? (
+        <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13.5px' }}>
+          <Clock size={28} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
+          <p style={{ fontWeight: 500, color: 'var(--text-main)', marginBottom: '4px' }}>No upcoming items</p>
+          <p>Your calendar and task deadlines are clear.</p>
+        </div>
+      ) : (
+        <div className="upcoming-timeline">
+          {items.map((item, index) => {
+            const isFirst = index === 0;
+            return (
+              <div 
+                key={item.id} 
+                className={`timeline-item ${isFirst ? 'timeline-item-current' : ''}`}
+              >
+                <div className="timeline-time-col">
+                  <span className="timeline-time">{item.time}</span>
+                  <span className="timeline-duration">{item.duration}</span>
                 </div>
-                {index < items.length - 1 && <div className="timeline-line" />}
-              </div>
 
-              <div className="timeline-content-col">
-                <div className="timeline-title-row">
-                  <h4 className="timeline-item-title">{item.title}</h4>
-                  {item.statusLabel && (
-                    <span className={`timeline-tag tag-${item.status}`}>
-                      {item.statusLabel}
-                    </span>
+                <div className="timeline-node-col">
+                  <div className={`timeline-dot dot-${item.status}`}>
+                    {getItemIcon(item.type)}
+                  </div>
+                  {index < items.length - 1 && <div className="timeline-line" />}
+                </div>
+
+                <div className="timeline-content-col">
+                  <div className="timeline-title-row">
+                    <h4 className="timeline-item-title">{item.title}</h4>
+                    {item.statusLabel && (
+                      <span className={`timeline-tag tag-${item.status}`}>
+                        {item.statusLabel}
+                      </span>
+                    )}
+                  </div>
+                  {item.subtitle && (
+                    <p className="timeline-item-subtitle">{item.subtitle}</p>
                   )}
                 </div>
-                {item.subtitle && (
-                  <p className="timeline-item-subtitle">{item.subtitle}</p>
-                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </aside>
   );
 }
+

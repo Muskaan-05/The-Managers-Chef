@@ -219,7 +219,21 @@ export default function MeetingCard({
                   <PlusSquare size={14} />
                   <span>Create Follow-up Task</span>
                 </button>
+
+                {onDeleteMeeting && (
+                  <button
+                    type="button"
+                    className="dropdown-item-btn"
+                    role="menuitem"
+                    style={{ color: 'var(--badge-rose-text)' }}
+                    onClick={() => handleAction(onDeleteMeeting)}
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete</span>
+                  </button>
+                )}
               </div>
+
             )}
           </div>
         </div>

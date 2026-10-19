@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import TaskSummary from './TaskSummary';
 import TaskFilterBar from './TaskFilterBar';
 import TaskTable from './TaskTable';
@@ -6,8 +6,15 @@ import TaskModal from './TaskModal';
 import PostponeModal from './PostponeModal';
 import JoinMeetingModal from './JoinMeetingModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
-import { mockInitialTasks } from '../../data/mockData';
-import { Check } from 'lucide-react';
+import { 
+  getTasks, 
+  createTask, 
+  updateTask, 
+  deleteTask, 
+  ensureDefaultContext 
+} from '../../services/api';
+import { formatDisplayDate, parseDateToISO, isDateOverdue } from '../../utils/dateUtils';
+import { Check, RefreshCw, AlertCircle } from 'lucide-react';
 import '../../styles/tasks.css';
 
 export default function TasksView({
@@ -15,16 +22,9 @@ export default function TasksView({
   setIsAddModalOpen,
   onTasksCountChange
 }) {
-  const [tasks, setTasks] = useState(() => {
-    // Read from localStorage if available, or fallback to mockInitialTasks
-    try {
-      const saved = localStorage.getItem('tmc_manager_tasks');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      // ignore
-    }
-    return mockInitialTasks;
-  });
+  const [tasks, setTasks] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,15 +43,52 @@ export default function TasksView({
     if (setIsAddModalOpen) setIsAddModalOpen(false);
   };
 
-  // Sync tasks to localStorage
-  useEffect(() => {
+  // Map backend task object to frontend display model
+  const mapBackendTask = useCallback((t) => {
+    const isCompleted = t.status === 'completed';
+    const isOverdue = !isCompleted && t.deadline && isDateOverdue(t.deadline);
+    const computedStatus = isCompleted ? 'completed' : (isOverdue ? 'overdue' : 'pending');
+
+    return {
+      id: t.id,
+      title: t.title,
+      description: t.description || '',
+      priority: t.priority || 'medium',
+      dueDate: formatDisplayDate(t.deadline, 'No deadline'),
+      rawDueDate: t.deadline || '',
+      project: 'General',
+      status: computedStatus,
+      rawStatus: t.status,
+      context_id: t.context_id,
+      estimated_duration: t.estimated_duration,
+      source: t.source || 'manual',
+    };
+  }, []);
+
+  // Fetch tasks from real backend API
+  const fetchTasks = useCallback(async () => {
     try {
-      localStorage.setItem('tmc_manager_tasks', JSON.stringify(tasks));
-    } catch (e) {
-      // ignore
+      setIsLoading(true);
+      setError(null);
+      const data = await getTasks();
+      const mapped = data.map(mapBackendTask);
+      setTasks(mapped);
+    } catch (err) {
+      console.error('Failed to load tasks:', err);
+      setError(err.message || 'Failed to load tasks from server');
+    } finally {
+      setIsLoading(false);
     }
+  }, [mapBackendTask]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  // Update badge count in parent
+  useEffect(() => {
     if (onTasksCountChange) {
-      const pendingCount = tasks.filter(t => t.status === 'pending' || t.status === 'overdue').length;
+      const pendingCount = tasks.filter((t) => t.status === 'pending' || t.status === 'overdue').length;
       onTasksCountChange(pendingCount);
     }
   }, [tasks, onTasksCountChange]);
@@ -96,75 +133,87 @@ export default function TasksView({
     });
   }, [tasks, activeFilter, searchQuery]);
 
-  // Task Actions
-  const handleToggleComplete = (task) => {
+  // Toggle complete state
+  const handleToggleComplete = async (task) => {
     const isNowCompleted = task.status !== 'completed';
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === task.id) {
-          return {
-            ...t,
-            status: isNowCompleted ? 'completed' : 'pending',
-          };
-        }
-        return t;
-      })
-    );
-    showToast(isNowCompleted ? `Task "${task.title}" completed.` : `Task "${task.title}" restored to Pending.`);
-  };
+    const newStatus = isNowCompleted ? 'completed' : 'pending';
 
-  const handleSaveTask = (taskData) => {
-    if (editingTask) {
-      // Updating existing task
-      setTasks((prev) =>
-        prev.map((t) => {
-          if (t.id === editingTask.id) {
-            return {
-              ...t,
-              ...taskData,
-            };
-          }
-          return t;
-        })
-      );
-      setEditingTask(null);
-      showToast('Task updated successfully.');
-    } else {
-      // Creating new task
-      const newTask = {
-        id: `task-${Date.now()}`,
-        ...taskData,
-        status: 'pending',
-      };
-      setTasks((prev) => [newTask, ...prev]);
-      closeAddModal();
-      showToast('New task added to queue.');
+    // Optimistic UI update
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, status: newStatus } : t))
+    );
+
+    try {
+      await updateTask(task.id, { status: newStatus });
+      showToast(isNowCompleted ? `Task "${task.title}" completed.` : `Task "${task.title}" restored to Pending.`);
+    } catch (err) {
+      // Revert on failure
+      fetchTasks();
+      showToast(`Error: ${err.message || 'Failed to update task status'}`);
     }
   };
 
-  const handlePostponeDeadline = (taskId, newDueDate) => {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          // If task was overdue or completed, moving due date forward makes it pending
-          const newStatus = t.status === 'completed' ? 'completed' : 'pending';
-          return {
-            ...t,
-            dueDate: newDueDate,
-            status: newStatus,
-          };
-        }
-        return t;
-      })
-    );
-    setPostponingTask(null);
-    showToast(`Deadline extended to: ${newDueDate}`);
+  // Save (Create or Edit)
+  const handleSaveTask = async (taskData) => {
+    try {
+      const deadlineISO = parseDateToISO(taskData.dueDate);
+
+      if (editingTask) {
+        // Edit existing task
+        await updateTask(editingTask.id, {
+          title: taskData.title,
+          description: taskData.description,
+          priority: taskData.priority,
+          deadline: deadlineISO,
+        });
+        setEditingTask(null);
+        showToast('Task updated successfully.');
+      } else {
+        // Create new task
+        const contextId = await ensureDefaultContext();
+        await createTask({
+          title: taskData.title,
+          description: taskData.description,
+          priority: taskData.priority,
+          deadline: deadlineISO,
+          context_id: contextId,
+          estimated_duration: 30,
+        });
+        closeAddModal();
+        showToast('New task created successfully.');
+      }
+      await fetchTasks();
+    } catch (err) {
+      showToast(`Error: ${err.message || 'Failed to save task'}`);
+    }
   };
 
-  const handleDeleteTask = (taskId) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    setDeletingTask(null);
-    showToast('Task deleted from workspace.');
+  // Postpone deadline
+  const handlePostponeDeadline = async (taskId, newDueDate) => {
+    try {
+      const deadlineISO = parseDateToISO(newDueDate);
+      await updateTask(taskId, {
+        deadline: deadlineISO,
+        status: 'pending',
+      });
+      setPostponingTask(null);
+      showToast(`Deadline extended.`);
+      await fetchTasks();
+    } catch (err) {
+      showToast(`Error: ${err.message || 'Failed to postpone deadline'}`);
+    }
+  };
+
+  // Delete task
+  const handleDeleteTask = async (taskId) => {
+    try {
+      await deleteTask(taskId);
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      setDeletingTask(null);
+      showToast('Task deleted from workspace.');
+    } catch (err) {
+      showToast(`Error: ${err.message || 'Failed to delete task'}`);
+    }
   };
 
   const handleResetFilters = () => {
@@ -176,7 +225,41 @@ export default function TasksView({
 
   return (
     <div className="tasks-container">
-      {/* 3. Task Summary Cards */}
+      {/* Error state if API fails */}
+      {error && (
+        <div style={{
+          padding: '12px 16px',
+          background: 'var(--badge-rose-bg)',
+          color: 'var(--badge-rose-text)',
+          border: '1px solid var(--badge-rose-border)',
+          borderRadius: 'var(--radius-md)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '13.5px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={fetchTasks}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'inherit',
+              cursor: 'pointer',
+              fontWeight: 600,
+              textDecoration: 'underline'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Task Summary Cards */}
       <TaskSummary
         tasks={tasks}
         activeFilter={activeFilter}
@@ -192,18 +275,25 @@ export default function TasksView({
         counts={counts}
       />
 
-      {/* 4. Task List & Table */}
-      <TaskTable
-        tasks={filteredTasks}
-        onToggleComplete={handleToggleComplete}
-        onEdit={(task) => setEditingTask(task)}
-        onPostpone={(task) => setPostponingTask(task)}
-        onJoinMeeting={(task) => setJoiningTask(task)}
-        onDelete={(task) => setDeletingTask(task)}
-        onResetFilters={handleResetFilters}
-        onAddTask={() => setLocalAddOpen(true)}
-        isFiltered={isFiltered}
-      />
+      {/* Task List & Table */}
+      {isLoading ? (
+        <div className="task-table-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <RefreshCw size={24} className="spin-icon" style={{ margin: '0 auto 12px' }} />
+          <p>Loading tasks from workspace...</p>
+        </div>
+      ) : (
+        <TaskTable
+          tasks={filteredTasks}
+          onToggleComplete={handleToggleComplete}
+          onEdit={(task) => setEditingTask(task)}
+          onPostpone={(task) => setPostponingTask(task)}
+          onJoinMeeting={(task) => setJoiningTask(task)}
+          onDelete={(task) => setDeletingTask(task)}
+          onResetFilters={handleResetFilters}
+          onAddTask={() => setLocalAddOpen(true)}
+          isFiltered={isFiltered}
+        />
+      )}
 
       {/* Modals & Dialogs */}
       {/* Add Task Modal */}

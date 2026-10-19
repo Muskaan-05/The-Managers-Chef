@@ -1,22 +1,32 @@
 import React, { useState } from 'react';
-import { Sparkles, Eye, EyeOff, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Eye, EyeOff, ArrowLeft, RefreshCw } from 'lucide-react';
+import { login } from '../../services/api';
 import '../../styles/auth.css';
 
 export default function SignInPage({ onNavigate, onSignIn }) {
-  const [email, setEmail] = useState('alex.morgan@company.internal');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError('Please enter both email and password.');
       return;
     }
     setError('');
-    // Frontend-only mock authentication success
-    onSignIn(email);
+    setIsSubmitting(true);
+
+    try {
+      const { user } = await login(email.trim(), password);
+      onSignIn(user);
+    } catch (err) {
+      setError(err.message || 'Failed to sign in. Please check your credentials.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -50,6 +60,7 @@ export default function SignInPage({ onNavigate, onSignIn }) {
                 placeholder="alex.morgan@company.internal"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isSubmitting}
                 required
               />
             </div>
@@ -67,6 +78,7 @@ export default function SignInPage({ onNavigate, onSignIn }) {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isSubmitting}
                 required
               />
               <button
@@ -75,14 +87,21 @@ export default function SignInPage({ onNavigate, onSignIn }) {
                 onClick={() => setShowPassword((prev) => !prev)}
                 title={showPassword ? 'Hide password' : 'Show password'}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
+                disabled={isSubmitting}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
 
-          <button type="submit" className="btn-auth-primary">
-            Sign In to Workspace
+          <button type="submit" className="btn-auth-primary" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <RefreshCw size={16} className="spin-icon" /> Signing in...
+              </span>
+            ) : (
+              'Sign In to Workspace'
+            )}
           </button>
         </form>
 

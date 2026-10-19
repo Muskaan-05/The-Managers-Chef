@@ -18,8 +18,10 @@ export default function Sidebar({
   setIsMobileOpen,
   user,
   tasksBadge,
-  meetingsBadge
+  meetingsBadge,
+  onLogout
 }) {
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'memories', label: 'Memories', icon: Brain, badge: '4 new' },
@@ -131,8 +133,9 @@ export default function Sidebar({
           <button
             type="button"
             className="sidebar-logout-btn"
-            onClick={() => handleNavClick('landing')}
+            onClick={onLogout ? onLogout : () => handleNavClick('landing')}
             title="Sign Out to Landing Page"
+
             style={{
               background: 'none',
               border: 'none',

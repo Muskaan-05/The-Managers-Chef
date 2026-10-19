@@ -13,7 +13,8 @@ export default function TopSection({
   const isTasksView     = activeNav === 'tasks';
   const isMeetingsView  = activeNav === 'meetings';
   const isMemoriesView  = activeNav === 'memories';
-  const isPageView      = isTasksView || isMeetingsView || isMemoriesView;
+  const isSettingsView  = activeNav === 'settings';
+  const isPageView      = isTasksView || isMeetingsView || isMemoriesView || isSettingsView;
 
   const pageTitle = isTasksView
     ? 'Tasks'
@@ -21,6 +22,8 @@ export default function TopSection({
     ? 'Meetings'
     : isMemoriesView
     ? 'Memories'
+    : isSettingsView
+    ? 'Settings'
     : `Good morning, ${greetingName}`;
 
   const pageSubtitle = isTasksView
@@ -29,6 +32,8 @@ export default function TopSection({
     ? 'Stay prepared for what\'s next.'
     : isMemoriesView
     ? 'Find the context you need, when you need it.'
+    : isSettingsView
+    ? 'Manage your integrations, calendar sync, and account preferences.'
     : 'Here\'s what needs your attention today.';
 
   return (
@@ -69,7 +74,7 @@ export default function TopSection({
             <Plus size={16} />
             <span>Schedule Meeting</span>
           </button>
-        ) : isMemoriesView ? (
+        ) : (isMemoriesView || isSettingsView) ? (
           null
         ) : (
           <div className="search-bar-wrapper">

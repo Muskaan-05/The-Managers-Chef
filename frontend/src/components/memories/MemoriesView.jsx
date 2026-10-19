@@ -21,7 +21,66 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { mockMemoriesData } from '../../data/memoriesData';
+import {
+  searchContext,
+  createContextItem,
+  ensureDefaultContext,
+  getToken,
+} from '../../services/api';
 import '../../styles/memories.css';
+
+/* ─── Utility: Map backend context item to memory model ───────────────────── */
+function mapContextItemToMemory(item) {
+  const meta = item.metadata || item.item_metadata || {};
+  const snippet = item.content || '';
+  const firstLine = snippet.split('\n')[0] || '';
+  const title = meta.title || (firstLine.length > 50 ? firstLine.slice(0, 50) + '…' : firstLine) || 'Context Note';
+
+  let cat = 'Project';
+  if (item.type) {
+    const t = item.type.toLowerCase();
+    if (t.includes('meet')) cat = 'Meeting';
+    else if (t.includes('decis')) cat = 'Decision';
+    else if (t.includes('task')) cat = 'Task';
+    else if (t.includes('commit')) cat = 'Commitment';
+    else if (t.includes('policy')) cat = 'Policy';
+    else if (t.includes('client')) cat = 'Client';
+    else if (t.includes('op')) cat = 'Operations';
+    else cat = t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  let formattedDate = 'Recent';
+  if (item.timestamp) {
+    try {
+      formattedDate = new Date(item.timestamp).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    } catch { /* ignore */ }
+  }
+
+  return {
+    id: item.id || `ctx-${Math.random()}`,
+    title,
+    summary: snippet,
+    fullSummary: snippet,
+    category: cat,
+    date: formattedDate,
+    source: item.source ? item.source.replace(/_/g, ' ') : 'Context Store',
+    client: meta.client || null,
+    project: meta.project || null,
+    people: meta.people || (meta.attendees ? meta.attendees : []),
+    relatedMeeting: meta.meeting_title || null,
+    relatedTask: meta.task_title || null,
+    relatedDecision: meta.decision || null,
+    keyDecisions: meta.keyDecisions || [],
+    context: meta.context || null,
+    pinned: Boolean(meta.pinned),
+    sortTimestamp: item.timestamp ? new Date(item.timestamp).getTime() : Date.now(),
+    isBackend: true,
+  };
+}
 
 /* ─── Utility: derive CSS class from category ─────────────────────────────── */
 function categoryClass(cat = '') {
@@ -585,6 +644,9 @@ export default function MemoriesView({ onNavigate }) {
     return mockMemoriesData;
   });
 
+  const [backendItems, setBackendItems] = useState([]);
+  const [isLoadingBackend, setIsLoadingBackend] = useState(false);
+
   const [searchQuery, setSearchQuery]     = useState('');
   const [activeFilter, setActiveFilter]   = useState('all');
   const [sortOrder, setSortOrder]         = useState('recent');
@@ -594,6 +656,41 @@ export default function MemoriesView({ onNavigate }) {
   const [toastMessage, setToastMessage]     = useState(null);
 
   const searchRef = useRef(null);
+
+  // Load from backend on mount and when searchQuery changes
+  useEffect(() => {
+    let isCurrent = true;
+    if (!getToken()) return;
+
+    async function loadBackendContext() {
+      try {
+        setIsLoadingBackend(true);
+        const results = await searchContext(searchQuery);
+        if (isCurrent && Array.isArray(results) && results.length > 0) {
+          const mapped = results.map(mapContextItemToMemory);
+          setBackendItems(mapped);
+        }
+      } catch (err) {
+        console.warn('Backend context search error:', err);
+      } finally {
+        if (isCurrent) setIsLoadingBackend(false);
+      }
+    }
+
+    const timer = setTimeout(loadBackendContext, 250);
+    return () => {
+      isCurrent = false;
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  // Merge backend items with local memories
+  const combinedMemories = useMemo(() => {
+    if (backendItems.length === 0) return memories;
+    const existingIds = new Set(backendItems.map((b) => b.id));
+    const localFiltered = memories.filter((m) => !existingIds.has(m.id));
+    return [...backendItems, ...localFiltered];
+  }, [backendItems, memories]);
 
   // Persist to localStorage
   useEffect(() => {
@@ -619,16 +716,16 @@ export default function MemoriesView({ onNavigate }) {
 
   /* Counts per filter */
   const counts = useMemo(() => {
-    const base = { all: memories.length };
+    const base = { all: combinedMemories.length };
     FILTERS.slice(1).forEach((f) => {
-      base[f.id] = memories.filter((m) => m.category === f.id).length;
+      base[f.id] = combinedMemories.filter((m) => m.category === f.id).length;
     });
     return base;
-  }, [memories]);
+  }, [combinedMemories]);
 
   /* Filter + Search + Sort */
   const filteredMemories = useMemo(() => {
-    let list = memories;
+    let list = combinedMemories;
 
     // Category filter
     if (activeFilter !== 'all') {
@@ -666,12 +763,13 @@ export default function MemoriesView({ onNavigate }) {
     }
 
     return list;
-  }, [memories, activeFilter, searchQuery, sortOrder]);
+  }, [combinedMemories, activeFilter, searchQuery, sortOrder]);
 
   /* Handlers */
   const handlePin = (id) => {
     setMemories((prev) => prev.map((m) => m.id === id ? { ...m, pinned: !m.pinned } : m));
-    const mem = memories.find((m) => m.id === id);
+    setBackendItems((prev) => prev.map((b) => b.id === id ? { ...b, pinned: !b.pinned } : b));
+    const mem = combinedMemories.find((m) => m.id === id);
     showToast(mem?.pinned ? `"${mem?.title}" unpinned.` : `"${mem?.title}" pinned.`);
     // Update selected memory if open
     if (selectedMemory?.id === id) {
@@ -684,10 +782,30 @@ export default function MemoriesView({ onNavigate }) {
     if (selectedMemory?.id === memory.id) setSelectedMemory(null);
   };
 
-  const handleSaveEdit = (updatedMemory) => {
+  const handleSaveEdit = async (updatedMemory) => {
     setMemories((prev) => prev.map((m) => m.id === updatedMemory.id ? updatedMemory : m));
+    setBackendItems((prev) => prev.map((b) => b.id === updatedMemory.id ? updatedMemory : b));
     setEditingMemory(null);
     showToast('Memory updated successfully.');
+
+    if (getToken()) {
+      try {
+        const defaultContextId = await ensureDefaultContext();
+        await createContextItem({
+          context_id: defaultContextId,
+          type: (updatedMemory.category || 'project').toLowerCase(),
+          source: 'manual_edit',
+          content: updatedMemory.fullSummary || updatedMemory.summary || updatedMemory.title,
+          metadata: {
+            title: updatedMemory.title,
+            category: updatedMemory.category,
+            pinned: Boolean(updatedMemory.pinned),
+          },
+        });
+      } catch (err) {
+        console.warn('Failed to mirror memory edit to backend:', err);
+      }
+    }
   };
 
   const handleDeleteRequest = (memory) => {
@@ -696,8 +814,9 @@ export default function MemoriesView({ onNavigate }) {
   };
 
   const handleDeleteConfirm = (id) => {
-    const mem = memories.find((m) => m.id === id);
+    const mem = combinedMemories.find((m) => m.id === id);
     setMemories((prev) => prev.filter((m) => m.id !== id));
+    setBackendItems((prev) => prev.filter((b) => b.id !== id));
     setDeletingMemory(null);
     showToast(`"${mem?.title}" deleted from workspace.`);
   };
@@ -708,7 +827,7 @@ export default function MemoriesView({ onNavigate }) {
     showToast(`Navigating to ${view === 'meetings' ? 'Meetings' : 'Tasks'}…`);
   };
 
-  const pinnedCount   = memories.filter((m) => m.pinned).length;
+  const pinnedCount   = combinedMemories.filter((m) => m.pinned).length;
   const isSearchActive = searchQuery.trim().length > 0;
 
   return (

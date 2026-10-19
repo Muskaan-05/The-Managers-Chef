@@ -8,6 +8,7 @@ export default function MeetingList({
   onViewDetails,
   onToggleFollowUp,
   onCreateFollowUpTask,
+  onDeleteMeeting,
   onResetFilters,
   onScheduleMeeting,
   isFiltered = false
@@ -63,8 +64,10 @@ export default function MeetingList({
           onViewDetails={onViewDetails}
           onToggleFollowUp={onToggleFollowUp}
           onCreateFollowUpTask={onCreateFollowUpTask}
+          onDeleteMeeting={onDeleteMeeting}
         />
       ))}
     </div>
   );
 }
+
