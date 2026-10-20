@@ -8,18 +8,22 @@ export default function TopSection({
   greetingName = "Manager",
   activeNav = "dashboard",
   onAddTask,
-  onScheduleMeeting
+  onScheduleMeeting,
+  onAddEvent
 }) {
   const isTasksView     = activeNav === 'tasks';
   const isMeetingsView  = activeNav === 'meetings';
+  const isEventsView    = activeNav === 'events';
   const isMemoriesView  = activeNav === 'memories';
   const isSettingsView  = activeNav === 'settings';
-  const isPageView      = isTasksView || isMeetingsView || isMemoriesView || isSettingsView;
+  const isPageView      = isTasksView || isMeetingsView || isEventsView || isMemoriesView || isSettingsView;
 
   const pageTitle = isTasksView
     ? 'Tasks'
     : isMeetingsView
     ? 'Meetings'
+    : isEventsView
+    ? 'Events'
     : isMemoriesView
     ? 'Memories'
     : isSettingsView
@@ -30,6 +34,8 @@ export default function TopSection({
     ? 'Stay on top of what needs to get done.'
     : isMeetingsView
     ? 'Stay prepared for what\'s next.'
+    : isEventsView
+    ? 'Manage your calendar schedules, appointments, and events.'
     : isMemoriesView
     ? 'Find the context you need, when you need it.'
     : isSettingsView
@@ -73,6 +79,15 @@ export default function TopSection({
           >
             <Plus size={16} />
             <span>Schedule Meeting</span>
+          </button>
+        ) : isEventsView ? (
+          <button
+            type="button"
+            className="primary-add-task-btn"
+            onClick={onAddEvent}
+          >
+            <Plus size={16} />
+            <span>Add Event</span>
           </button>
         ) : (isMemoriesView || isSettingsView) ? (
           null

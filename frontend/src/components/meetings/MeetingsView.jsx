@@ -9,8 +9,10 @@ import JoinMeetingModal from '../tasks/JoinMeetingModal';
 import { 
   getMeetings, 
   createMeeting, 
+  updateMeeting,
   deleteMeeting, 
   getEvents, 
+  updateEvent,
   deleteEvent, 
   createTask, 
   ensureDefaultContext,
@@ -19,7 +21,7 @@ import {
   submitMeetingTranscript,
   joinMeeting
 } from '../../services/api';
-import { formatDisplayDate, parseMeetingTimes } from '../../utils/dateUtils';
+import { formatDisplayDate, parseMeetingTimes, isMeetingEntry } from '../../utils/dateUtils';
 import { Check, RefreshCw, AlertCircle } from 'lucide-react';
 import '../../styles/meetings.css';
 
@@ -37,6 +39,7 @@ export default function MeetingsView({
 
   // Internal modal states
   const [localScheduleOpen, setLocalScheduleOpen] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState(null);
   const [selectedDetailMeeting, setSelectedDetailMeeting] = useState(null);
   const [joiningMeeting, setJoiningMeeting] = useState(null);
   const [followUpTaskMeeting, setFollowUpTaskMeeting] = useState(null);
@@ -45,6 +48,7 @@ export default function MeetingsView({
   const isScheduleOpen = isScheduleModalOpen || localScheduleOpen;
   const closeScheduleModal = () => {
     setLocalScheduleOpen(false);
+    setEditingMeeting(null);
     if (setIsScheduleModalOpen) setIsScheduleModalOpen(false);
   };
 
@@ -54,8 +58,8 @@ export default function MeetingsView({
     const end = m.end_time ? new Date(m.end_time) : new Date(start.getTime() + 45 * 60 * 1000);
     const now = new Date();
     const isToday = start.toDateString() === now.toDateString();
-    const isCompleted = end < now;
-    const computedStatus = isCompleted ? 'completed' : (isToday ? 'today' : 'upcoming');
+    const isPast = end < now;
+    const computedStatus = isPast ? 'completed' : (isToday ? 'today' : 'upcoming');
 
     const formattedStart = formatDisplayDate(m.start_time);
     const timeOnly = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + 
@@ -85,6 +89,11 @@ export default function MeetingsView({
       isEvent: false,
       context_id: m.context_id,
       bot_process_id: m.bot_process_id,
+      startDate: start,
+      endDate: end,
+      isPast: isPast,
+      isGoogle: false,
+      source: 'manual',
     };
   }, []);
 
@@ -94,10 +103,10 @@ export default function MeetingsView({
     const end = e.end_time ? new Date(e.end_time) : new Date(start.getTime() + 30 * 60 * 1000);
     const now = new Date();
     const isToday = start.toDateString() === now.toDateString();
-    const isCompleted = end < now;
-    const computedStatus = isCompleted ? 'completed' : (isToday ? 'today' : 'upcoming');
+    const isPast = end < now;
+    const computedStatus = isPast ? 'completed' : (isToday ? 'today' : 'upcoming');
 
-    const isGoogle = e.source === 'google_calendar';
+    const isGoogle = e.source === 'google_calendar' || Boolean(e.google_event_id);
     const formattedStart = formatDisplayDate(e.start_time);
     const timeOnly = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
@@ -105,7 +114,7 @@ export default function MeetingsView({
       id: e.id,
       title: e.title,
       clientProject: isGoogle ? 'Google Calendar' : 'General',
-      meetingType: isGoogle ? 'Google Event' : 'Calendar Event',
+      meetingType: isGoogle ? 'Google Meeting' : 'Calendar Meeting',
       date: isToday ? 'Today' : start.toLocaleDateString([], { month: 'short', day: 'numeric' }),
       time: timeOnly,
       timeLabel: `${formattedStart} · ${isGoogle ? 'Google Calendar' : 'Calendar Event'}`,
@@ -124,8 +133,12 @@ export default function MeetingsView({
       actionItems: [],
       isEvent: true,
       context_id: e.context_id,
-      source: e.source,
+      source: e.source || (isGoogle ? 'google_calendar' : 'manual'),
       google_event_id: e.google_event_id,
+      startDate: start,
+      endDate: end,
+      isPast: isPast,
+      isGoogle: isGoogle,
     };
   }, []);
 
@@ -140,17 +153,25 @@ export default function MeetingsView({
       ]);
 
       const mappedMeetings = (meetingsData || []).map(mapBackendMeeting);
-      const mappedEvents = (eventsData || []).map(mapBackendEvent);
+      
+      // Filter events to only display calendar items that represent meetings
+      const meetingEvents = (eventsData || []).filter(isMeetingEntry);
+      const mappedEvents = meetingEvents.map(mapBackendEvent);
 
-      // Combine and sort chronologically
+      // Combine and split into upcoming vs past
       const combined = [...mappedMeetings, ...mappedEvents];
-      combined.sort((a, b) => {
-        const timeA = a.rawMeeting?.start_time || a.rawEvent?.start_time || a.timeLabel;
-        const timeB = b.rawMeeting?.start_time || b.rawEvent?.start_time || b.timeLabel;
-        return String(timeA).localeCompare(String(timeB));
-      });
 
-      setMeetings(combined);
+      // Upcoming meetings: sorted nearest first (ascending by start time)
+      const upcoming = combined
+        .filter((m) => !m.isPast)
+        .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+      // Past meetings: sorted most recent first (descending by start time)
+      const past = combined
+        .filter((m) => m.isPast)
+        .sort((a, b) => b.startDate.getTime() - a.startDate.getTime());
+
+      setMeetings([...upcoming, ...past]);
     } catch (err) {
       console.error('Failed to load meetings:', err);
       setError(err.message || 'Failed to load meetings from server');
@@ -166,7 +187,7 @@ export default function MeetingsView({
   // Update badge count
   useEffect(() => {
     if (onMeetingsCountChange) {
-      const todayOrUpcoming = meetings.filter((m) => m.status === 'today' || m.status === 'upcoming').length;
+      const todayOrUpcoming = meetings.filter((m) => !m.isPast).length;
       onMeetingsCountChange(todayOrUpcoming);
     }
   }, [meetings, onMeetingsCountChange]);
@@ -183,8 +204,8 @@ export default function MeetingsView({
     return {
       all: meetings.length,
       today: meetings.filter((m) => m.status === 'today').length,
-      upcoming: meetings.filter((m) => m.status === 'upcoming' || m.status === 'today').length,
-      completed: meetings.filter((m) => m.status === 'completed').length,
+      upcoming: meetings.filter((m) => !m.isPast).length,
+      completed: meetings.filter((m) => m.isPast).length,
       needs_followup: meetings.filter((m) => m.needsFollowUp).length,
     };
   }, [meetings]);
@@ -195,10 +216,10 @@ export default function MeetingsView({
       if (activeFilter === 'today' && m.status !== 'today') {
         return false;
       }
-      if (activeFilter === 'upcoming' && m.status !== 'upcoming' && m.status !== 'today') {
+      if (activeFilter === 'upcoming' && m.isPast) {
         return false;
       }
-      if (activeFilter === 'completed' && m.status !== 'completed') {
+      if (activeFilter === 'completed' && !m.isPast) {
         return false;
       }
       if (activeFilter === 'needs_followup' && !m.needsFollowUp) {
@@ -218,28 +239,55 @@ export default function MeetingsView({
     });
   }, [meetings, activeFilter, searchQuery]);
 
-  // Schedule a new meeting
-  const handleScheduleMeeting = async (meetingFormData) => {
+  // Schedule or Edit a meeting
+  const handleScheduleMeeting = async (meetingFormData, isEditing) => {
     try {
-      const contextId = await ensureDefaultContext();
       const { startTimeISO, endTimeISO } = parseMeetingTimes(meetingFormData.date, meetingFormData.time);
 
-      await createMeeting({
-        title: meetingFormData.title,
-        start_time: startTimeISO,
-        end_time: endTimeISO,
-        meet_link: meetingFormData.meetingLink,
-        status: 'scheduled',
-        participants: meetingFormData.participants || [],
-        context_id: contextId,
-      });
-
-      closeScheduleModal();
-      showToast('Meeting scheduled successfully.');
+      if (isEditing && editingMeeting) {
+        if (editingMeeting.isEvent) {
+          await updateEvent(editingMeeting.id, {
+            title: meetingFormData.title,
+            start_time: startTimeISO,
+            end_time: endTimeISO,
+            location: meetingFormData.meetingLink || meetingFormData.location,
+            participants: meetingFormData.participants || [],
+          });
+        } else {
+          await updateMeeting(editingMeeting.id, {
+            title: meetingFormData.title,
+            start_time: startTimeISO,
+            end_time: endTimeISO,
+            meet_link: meetingFormData.meetingLink,
+            status: meetingFormData.status || 'scheduled',
+            participants: meetingFormData.participants || [],
+          });
+        }
+        closeScheduleModal();
+        showToast('Meeting updated successfully.');
+      } else {
+        const contextId = await ensureDefaultContext();
+        await createMeeting({
+          title: meetingFormData.title,
+          start_time: startTimeISO,
+          end_time: endTimeISO,
+          meet_link: meetingFormData.meetingLink,
+          status: 'scheduled',
+          participants: meetingFormData.participants || [],
+          context_id: contextId,
+        });
+        closeScheduleModal();
+        showToast('Meeting scheduled successfully.');
+      }
       await fetchMeetingsAndEvents();
     } catch (err) {
-      showToast(`Error: ${err.message || 'Failed to schedule meeting'}`);
+      showToast(`Error: ${err.message || 'Failed to save meeting'}`);
     }
+  };
+
+  const handleEditMeeting = (meeting) => {
+    setEditingMeeting(meeting);
+    setLocalScheduleOpen(true);
   };
 
   // Delete meeting or event
@@ -354,7 +402,7 @@ export default function MeetingsView({
             style={{
               background: 'none',
               border: 'none',
-              color: 'inherit',
+              color: 'currentColor',
               cursor: 'pointer',
               fontWeight: 600,
               textDecoration: 'underline'
@@ -381,7 +429,7 @@ export default function MeetingsView({
         counts={counts}
       />
 
-      {/* Upcoming / Filtered Meetings List */}
+      {/* Upcoming & Past Meetings List */}
       {isLoading ? (
         <div className="task-table-card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
           <RefreshCw size={24} className="spin-icon" style={{ margin: '0 auto 12px' }} />
@@ -394,18 +442,23 @@ export default function MeetingsView({
           onViewDetails={(meeting) => setSelectedDetailMeeting(meeting)}
           onToggleFollowUp={handleToggleFollowUp}
           onCreateFollowUpTask={(meeting) => setFollowUpTaskMeeting(meeting)}
+          onEditMeeting={handleEditMeeting}
           onDeleteMeeting={handleDeleteMeeting}
           onResetFilters={handleResetFilters}
-          onScheduleMeeting={() => setLocalScheduleOpen(true)}
+          onScheduleMeeting={() => {
+            setEditingMeeting(null);
+            setLocalScheduleOpen(true);
+          }}
           isFiltered={isFiltered}
         />
       )}
 
-      {/* Schedule Meeting Modal */}
+      {/* Schedule / Edit Meeting Modal */}
       <ScheduleMeetingModal
         isOpen={isScheduleOpen}
         onClose={closeScheduleModal}
         onSchedule={handleScheduleMeeting}
+        meetingToEdit={editingMeeting}
       />
 
       {/* Meeting Detail Modal */}

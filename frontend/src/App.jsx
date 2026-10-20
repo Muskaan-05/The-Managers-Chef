@@ -6,6 +6,7 @@ import RelevantMemoriesSection from './components/dashboard/RelevantMemoriesSect
 import UpcomingSection from './components/dashboard/UpcomingSection';
 import TasksView from './components/tasks/TasksView';
 import MeetingsView from './components/meetings/MeetingsView';
+import EventsView from './components/events/EventsView';
 import MemoriesView from './components/memories/MemoriesView';
 import SettingsView from './components/settings/SettingsView';
 import LandingPage from './components/landing/LandingPage';
@@ -62,6 +63,10 @@ function App() {
   // Meetings page state
   const [isScheduleMeetingModalOpen, setIsScheduleMeetingModalOpen] = useState(false);
   const [meetingsBadgeCount, setMeetingsBadgeCount] = useState(5);
+
+  // Events page state
+  const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
+  const [eventsBadgeCount, setEventsBadgeCount] = useState(undefined);
 
   const showToast = (message, isError = false) => {
     setToast({ message, isError });
@@ -171,7 +176,7 @@ function App() {
   // Map live AI Brief items from backend dashboard data
   const aiBriefItems = useMemo(() => {
     if (!getToken()) return mockAiBriefItems;
-    if (!dashboardData) return mockAiBriefItems;
+    if (!dashboardData) return [];
 
     const items = [];
 
@@ -237,7 +242,7 @@ function App() {
   // Map live Upcoming items from backend dashboard data
   const upcomingItems = useMemo(() => {
     if (!getToken()) return mockUpcomingItems;
-    if (!dashboardData) return mockUpcomingItems;
+    if (!dashboardData) return [];
 
     const items = [];
 
@@ -276,7 +281,7 @@ function App() {
 
   // Filter memories live based on user query
   const filteredMemories = useMemo(() => {
-    let baseMemories = mockRelevantMemories;
+    let baseMemories = getToken() ? [] : mockRelevantMemories;
     if (dashboardData?.context_highlights?.length > 0) {
       baseMemories = dashboardData.context_highlights.map((h, i) => ({
         id: `ctx-${i}`,
@@ -425,6 +430,16 @@ function App() {
       );
     }
 
+    if (activeNav === 'events') {
+      return (
+        <EventsView
+          isAddModalOpen={isAddEventModalOpen}
+          setIsAddModalOpen={setIsAddEventModalOpen}
+          onEventsCountChange={setEventsBadgeCount}
+        />
+      );
+    }
+
     if (activeNav === 'memories') {
       return (
         <MemoriesView
@@ -511,6 +526,7 @@ function App() {
         user={currentUser}
         tasksBadge={tasksBadgeCount}
         meetingsBadge={meetingsBadgeCount}
+        eventsBadge={eventsBadgeCount}
         onLogout={handleLogout}
       />
 
@@ -525,6 +541,7 @@ function App() {
           activeNav={activeNav}
           onAddTask={() => setIsAddTaskModalOpen(true)}
           onScheduleMeeting={() => setIsScheduleMeetingModalOpen(true)}
+          onAddEvent={() => setIsAddEventModalOpen(true)}
         />
 
         {/* Main Workspace */}

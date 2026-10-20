@@ -4,8 +4,11 @@ import { X, Calendar, Video, Folder, Users, AlertCircle } from 'lucide-react';
 export default function ScheduleMeetingModal({
   isOpen,
   onClose,
-  onSchedule
+  onSchedule,
+  meetingToEdit = null
 }) {
+  const isEditing = Boolean(meetingToEdit);
+
   const [title, setTitle] = useState('');
   const [clientProject, setClientProject] = useState('');
   const [meetingType, setMeetingType] = useState('Team Sync');
@@ -20,19 +23,36 @@ export default function ScheduleMeetingModal({
 
   useEffect(() => {
     if (isOpen) {
-      setTitle('');
-      setClientProject('');
-      setMeetingType('Team Sync');
-      setDate('Today');
-      setTime('04:00 PM - 04:45 PM');
-      setLocation('Google Meet');
-      setMeetingLink('https://meet.google.com/chef-new-sync');
-      setParticipants('Elena Rostova, Alex Morgan');
-      setAgenda('');
-      setPreviousContext('');
+      if (meetingToEdit) {
+        setTitle(meetingToEdit.title || '');
+        setClientProject(meetingToEdit.clientProject || '');
+        setMeetingType(meetingToEdit.meetingType || 'Team Sync');
+        setDate(meetingToEdit.date || 'Today');
+        setTime(meetingToEdit.time || '04:00 PM - 04:45 PM');
+        setLocation(meetingToEdit.location || 'Google Meet');
+        setMeetingLink(meetingToEdit.meetingLink || '');
+        setParticipants(
+          Array.isArray(meetingToEdit.participants)
+            ? meetingToEdit.participants.join(', ')
+            : (meetingToEdit.participants || '')
+        );
+        setAgenda(meetingToEdit.agenda || meetingToEdit.notes || '');
+        setPreviousContext(meetingToEdit.previousContext || '');
+      } else {
+        setTitle('');
+        setClientProject('');
+        setMeetingType('Team Sync');
+        setDate('Today');
+        setTime('04:00 PM - 04:45 PM');
+        setLocation('Google Meet');
+        setMeetingLink('https://meet.google.com/chef-new-sync');
+        setParticipants('Elena Rostova, Alex Morgan');
+        setAgenda('');
+        setPreviousContext('');
+      }
       setError('');
     }
-  }, [isOpen]);
+  }, [isOpen, meetingToEdit]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -51,29 +71,28 @@ export default function ScheduleMeetingModal({
       return;
     }
 
-    const newMeeting = {
-      id: `meet-${Date.now()}`,
+    const meetingPayload = {
+      id: meetingToEdit?.id || `meet-${Date.now()}`,
       title: title.trim(),
       clientProject: clientProject.trim() || 'General',
       meetingType,
       date: date.trim() || 'Today',
       time: time.trim() || 'TBD',
       timeLabel: `${date.trim() || 'Today'} · ${time.trim() || 'TBD'}`,
-      participants: participants.split(',').map((p) => p.trim()).filter(Boolean),
+      participants: typeof participants === 'string'
+        ? participants.split(',').map((p) => p.trim()).filter(Boolean)
+        : participants,
       location: location.trim() || 'Google Meet',
-      meetingLink: meetingLink.trim() || 'https://meet.google.com/chef-team-sync',
+      meetingLink: meetingLink.trim() || '',
       status: date.toLowerCase().includes('today') ? 'today' : 'upcoming',
-      needsFollowUp: false,
-      agenda: agenda.trim() || 'Discuss project milestones and sync on action items.',
-      previousContext: previousContext.trim() || '',
-      relatedMemories: [],
-      relatedTasks: [],
-      notes: '',
-      keyDecisions: [],
-      actionItems: []
+      needsFollowUp: meetingToEdit ? meetingToEdit.needsFollowUp : false,
+      agenda: agenda.trim(),
+      previousContext: previousContext.trim(),
+      context_id: meetingToEdit?.context_id,
+      isEvent: Boolean(meetingToEdit?.isEvent),
     };
 
-    onSchedule(newMeeting);
+    onSchedule(meetingPayload, isEditing, meetingToEdit?.id);
   };
 
   const meetingTypes = ['Team Sync', '1:1', 'Client Review', 'Architecture Review', 'Strategy', 'Incident Post-Mortem'];
@@ -83,8 +102,8 @@ export default function ScheduleMeetingModal({
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title-group">
-            <h3 className="modal-title">Schedule Meeting</h3>
-            <p className="modal-subtitle">Add an upcoming discussion, client review, or 1:1.</p>
+            <h3 className="modal-title">{isEditing ? 'Edit Meeting' : 'Schedule Meeting'}</h3>
+            <p className="modal-subtitle">{isEditing ? 'Update meeting agenda, time, or participants.' : 'Add an upcoming discussion, client review, or 1:1.'}</p>
           </div>
           <button 
             type="button" 
@@ -249,7 +268,7 @@ export default function ScheduleMeetingModal({
               Cancel
             </button>
             <button type="submit" className="btn-primary">
-              Schedule Meeting
+              {isEditing ? 'Save Changes' : 'Schedule Meeting'}
             </button>
           </div>
         </form>

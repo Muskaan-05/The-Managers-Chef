@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import MeetingCard from './MeetingCard';
 import { SearchX, Calendar, Plus } from 'lucide-react';
 
@@ -8,11 +8,21 @@ export default function MeetingList({
   onViewDetails,
   onToggleFollowUp,
   onCreateFollowUpTask,
+  onOpenNotes,
+  onEditMeeting,
   onDeleteMeeting,
   onResetFilters,
   onScheduleMeeting,
   isFiltered = false
 }) {
+  const upcomingMeetings = useMemo(() => {
+    return meetings.filter((m) => !m.isPast);
+  }, [meetings]);
+
+  const pastMeetings = useMemo(() => {
+    return meetings.filter((m) => m.isPast);
+  }, [meetings]);
+
   if (meetings.length === 0) {
     return (
       <div className="task-table-card">
@@ -55,19 +65,56 @@ export default function MeetingList({
   }
 
   return (
-    <div className="meetings-list-container">
-      {meetings.map((meeting) => (
-        <MeetingCard
-          key={meeting.id}
-          meeting={meeting}
-          onJoinMeeting={onJoinMeeting}
-          onViewDetails={onViewDetails}
-          onToggleFollowUp={onToggleFollowUp}
-          onCreateFollowUpTask={onCreateFollowUpTask}
-          onDeleteMeeting={onDeleteMeeting}
-        />
-      ))}
+    <div className="meetings-list-wrapper">
+      {/* 1. Upcoming Meetings Section (Meetings that have not ended) */}
+      {upcomingMeetings.length > 0 && (
+        <section className="meetings-section upcoming-meetings-section">
+          <div className="meetings-section-header">
+            <h3 className="meetings-section-title">Upcoming Meetings</h3>
+            <span className="meetings-section-count">{upcomingMeetings.length}</span>
+          </div>
+          <div className="meetings-list-container">
+            {upcomingMeetings.map((meeting) => (
+              <MeetingCard
+                key={meeting.id}
+                meeting={meeting}
+                onJoinMeeting={onJoinMeeting}
+                onViewDetails={onViewDetails}
+                onToggleFollowUp={onToggleFollowUp}
+                onCreateFollowUpTask={onCreateFollowUpTask}
+                onOpenNotes={onOpenNotes}
+                onEditMeeting={onEditMeeting}
+                onDeleteMeeting={onDeleteMeeting}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 2. Past Meetings Section (Meetings whose end time has passed) */}
+      {pastMeetings.length > 0 && (
+        <section className="meetings-section past-meetings-section">
+          <div className="meetings-section-header">
+            <h3 className="meetings-section-title">Past Meetings</h3>
+            <span className="meetings-section-count">{pastMeetings.length}</span>
+          </div>
+          <div className="meetings-list-container">
+            {pastMeetings.map((meeting) => (
+              <MeetingCard
+                key={meeting.id}
+                meeting={meeting}
+                onJoinMeeting={onJoinMeeting}
+                onViewDetails={onViewDetails}
+                onToggleFollowUp={onToggleFollowUp}
+                onCreateFollowUpTask={onCreateFollowUpTask}
+                onOpenNotes={onOpenNotes}
+                onEditMeeting={onEditMeeting}
+                onDeleteMeeting={onDeleteMeeting}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
-

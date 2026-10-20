@@ -3,6 +3,7 @@ import {
   LayoutDashboard, 
   Brain, 
   Calendar, 
+  CalendarDays,
   CheckSquare, 
   Settings, 
   Sparkles,
@@ -19,6 +20,7 @@ export default function Sidebar({
   user,
   tasksBadge,
   meetingsBadge,
+  eventsBadge,
   onLogout
 }) {
 
@@ -30,6 +32,12 @@ export default function Sidebar({
       label: 'Meetings', 
       icon: Calendar,
       badge: meetingsBadge !== undefined ? (meetingsBadge > 0 ? String(meetingsBadge) : undefined) : undefined
+    },
+    { 
+      id: 'events', 
+      label: 'Events', 
+      icon: CalendarDays,
+      badge: eventsBadge !== undefined ? (eventsBadge > 0 ? String(eventsBadge) : undefined) : undefined
     },
     { 
       id: 'tasks', 

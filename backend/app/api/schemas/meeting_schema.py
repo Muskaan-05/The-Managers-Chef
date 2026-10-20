@@ -14,6 +14,16 @@ class MeetingCreate(BaseModel):
     context_id: UUID
 
 
+class MeetingUpdate(BaseModel):
+    title: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    meet_link: Optional[str] = None
+    status: Optional[str] = None
+    participants: Optional[List[str]] = None
+    context_id: Optional[UUID] = None
+
+
 class MeetingOut(BaseModel):
     id: UUID
     user_id: UUID

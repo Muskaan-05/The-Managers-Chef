@@ -11,6 +11,7 @@ from app.services.meeting_service import (
     create_meeting,
     get_meeting,
     list_meetings,
+    update_meeting,
     update_meeting_transcript,
     update_meeting_summary,
     update_bot_details,
@@ -18,6 +19,7 @@ from app.services.meeting_service import (
 )
 from app.api.schemas.meeting_schema import (
     MeetingCreate,
+    MeetingUpdate,
     MeetingOut,
     MeetingListOut,
     TranscriptPayload,
@@ -128,6 +130,30 @@ def end_meeting(
         pass
     update_bot_details(db, current_user.id, meeting_id, status="ended")
     return {"status": "ended"}
+
+
+@router.patch("/{meeting_id}", response_model=MeetingOut)
+@router.put("/{meeting_id}", response_model=MeetingOut)
+def update_meeting_route(
+    meeting_id: UUID,
+    payload: MeetingUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    meeting = update_meeting(
+        db,
+        user_id=current_user.id,
+        meeting_id=meeting_id,
+        title=payload.title,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        participants=payload.participants,
+        meet_link=payload.meet_link,
+        status=payload.status,
+    )
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return meeting
 
 
 @router.delete("/{meeting_id}")

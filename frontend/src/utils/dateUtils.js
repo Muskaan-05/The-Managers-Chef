@@ -111,3 +111,29 @@ export function parseMeetingTimes(dateStr, timeStr) {
   };
 }
 
+export function isMeetingEntry(entry) {
+  if (!entry) return false;
+  if (entry.meet_link || entry.meetingLink) return true;
+  const loc = (entry.location || '').toLowerCase();
+  if (
+    loc.includes('meet.google.com') ||
+    loc.includes('zoom.us') ||
+    loc.includes('teams.microsoft.com') ||
+    loc.includes('webex.com') ||
+    loc.startsWith('http://') ||
+    loc.startsWith('https://')
+  ) {
+    return true;
+  }
+  if (Array.isArray(entry.participants) && entry.participants.length > 0) {
+    return true;
+  }
+  const title = (entry.title || '').toLowerCase();
+  const meetingKeywords = [
+    'meeting', 'sync', '1:1', '1-1', 'standup', 'catchup',
+    'catch-up', 'interview', 'discussion', 'call', 'review',
+    'retro', 'retrospective', 'demo', 'planning', 'briefing', 'alignment'
+  ];
+  return meetingKeywords.some((kw) => title.includes(kw));
+}
+

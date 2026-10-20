@@ -689,3 +689,148 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   Upcoming & Past Meeting Section Organization
+   ========================================================================== */
+.meetings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.meetings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+}
+
+.meetings-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.meetings-section-count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  background-color: var(--bg-card-subtle, #f1f5f9);
+  color: var(--text-muted, #64748b);
+  border: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+.past-meetings-section {
+  margin-top: 16px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--border-subtle, #e2e8f0);
+}
+
+/* Greyed-out style for ended / past meetings */
+.meeting-card-item.item-past {
+  background-color: var(--bg-card-subtle, #f8fafc);
+  opacity: 0.78;
+  border-color: var(--border-subtle, #e2e8f0);
+}
+
+.meeting-card-item.item-past:hover {
+  opacity: 1;
+  background-color: var(--bg-card, #ffffff);
+}
+
+.meeting-card-item.item-past .meeting-card-title {
+  color: var(--text-muted, #64748b);
+}
+
+/* Google Calendar Source Badge */
+.meeting-google-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm, 4px);
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+/* Contextual Actions Dropdown Menu */
+.action-menu-trigger {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.action-menu-trigger:hover,
+.action-menu-trigger.active {
+  background-color: var(--bg-hover);
+  border-color: var(--border-subtle);
+  color: var(--text-main);
+}
+
+.actions-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  width: 190px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-elevated);
+  padding: 4px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-item-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-body);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.dropdown-item-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.dropdown-item-btn.item-danger {
+  color: var(--badge-rose-text);
+}
+
+.dropdown-item-btn.item-danger:hover {
+  background-color: var(--badge-rose-bg);
+}
+
+.dropdown-divider {
+  height: 1px;
+  background-color: var(--border-light);
+  margin: 4px 0;
+}

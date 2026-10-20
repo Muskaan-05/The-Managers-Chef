@@ -10,7 +10,10 @@ import {
   CheckCircle2, 
   AlertTriangle, 
   ExternalLink,
-  PlusSquare
+  PlusSquare,
+  Pencil,
+  Trash2,
+  Globe
 } from 'lucide-react';
 
 export default function MeetingCard({
@@ -19,7 +22,9 @@ export default function MeetingCard({
   onViewDetails,
   onToggleFollowUp,
   onCreateFollowUpTask,
-  onOpenNotes
+  onOpenNotes,
+  onEditMeeting,
+  onDeleteMeeting
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -43,25 +48,34 @@ export default function MeetingCard({
   }, [isMenuOpen]);
 
   const isToday = meeting.status === 'today';
-  const isCompleted = meeting.status === 'completed';
-  const isUpcoming = meeting.status === 'upcoming' || isToday;
+  const isPast = meeting.isPast || meeting.status === 'completed';
+  const isCompleted = isPast;
+  const isUpcoming = !isPast;
+  const isGoogle = meeting.isGoogle || meeting.source === 'google_calendar';
 
   const handleAction = (callback) => {
     setIsMenuOpen(false);
-    callback(meeting);
+    if (callback) callback(meeting);
   };
 
   return (
     <article 
-      className={`meeting-card-item ${isToday ? 'item-today' : ''} ${meeting.needsFollowUp ? 'item-needs-followup' : ''}`}
+      className={`meeting-card-item ${isToday ? 'item-today' : ''} ${isPast ? 'item-past' : ''} ${meeting.needsFollowUp ? 'item-needs-followup' : ''}`}
     >
       {/* Card Header */}
       <div className="meeting-card-header">
         <div className="meeting-header-main">
           <div className="meeting-meta-row">
-            <span className="meeting-type-badge">
-              {meeting.meetingType}
-            </span>
+            {isGoogle ? (
+              <span className="meeting-google-badge" title="Synced from Google Calendar (Read-only)">
+                <Globe size={11} />
+                <span>Google Calendar</span>
+              </span>
+            ) : (
+              <span className="meeting-type-badge">
+                {meeting.meetingType || 'Meeting'}
+              </span>
+            )}
             <span className="meeting-project-badge">
               <Folder size={12} style={{ color: 'var(--text-subtle)' }} />
               <span>{meeting.clientProject || 'General'}</span>
@@ -72,11 +86,15 @@ export default function MeetingCard({
                 <span>Needs Follow-up</span>
               </span>
             )}
-            {isCompleted && (
+            {isPast ? (
               <span className="status-pill status-completed">
-                Completed
+                Past
               </span>
-            )}
+            ) : isToday ? (
+              <span className="status-pill status-today">
+                Today
+              </span>
+            ) : null}
           </div>
 
           <h3 
@@ -89,7 +107,7 @@ export default function MeetingCard({
         </div>
 
         {/* Time Badge */}
-        <div className={`meeting-time-badge ${isToday ? 'time-today' : ''}`}>
+        <div className={`meeting-time-badge ${isToday ? 'time-today' : ''} ${isPast ? 'time-past' : ''}`}>
           <Clock size={14} />
           <span>{meeting.timeLabel || `${meeting.date} · ${meeting.time}`}</span>
         </div>
@@ -142,7 +160,7 @@ export default function MeetingCard({
 
         <div className="meeting-actions-group">
           {/* Join Meeting button (for upcoming / today meetings) */}
-          {isUpcoming && (
+          {isUpcoming && meeting.meetingLink && (
             <button
               type="button"
               className="btn-join-meeting"
@@ -188,7 +206,20 @@ export default function MeetingCard({
                   <span>View Details & Notes</span>
                 </button>
 
-                {isUpcoming && (
+                {/* Edit Action */}
+                {!isGoogle && onEditMeeting && (
+                  <button
+                    type="button"
+                    className="dropdown-item-btn"
+                    role="menuitem"
+                    onClick={() => handleAction(onEditMeeting)}
+                  >
+                    <Pencil size={14} />
+                    <span>Edit Meeting</span>
+                  </button>
+                )}
+
+                {isUpcoming && meeting.meetingLink && (
                   <button
                     type="button"
                     className="dropdown-item-btn"
@@ -220,20 +251,26 @@ export default function MeetingCard({
                   <span>Create Follow-up Task</span>
                 </button>
 
-                {onDeleteMeeting && (
-                  <button
-                    type="button"
-                    className="dropdown-item-btn"
-                    role="menuitem"
-                    style={{ color: 'var(--badge-rose-text)' }}
-                    onClick={() => handleAction(onDeleteMeeting)}
-                  >
-                    <Trash2 size={14} />
-                    <span>Delete</span>
-                  </button>
+                {onDeleteMeeting && !isGoogle && (
+                  <>
+                    <div className="dropdown-divider" />
+                    <button
+                      type="button"
+                      className="dropdown-item-btn item-danger"
+                      role="menuitem"
+                      onClick={() => handleAction(onDeleteMeeting)}
+                    >
+                      <Trash2 size={14} />
+                      <span>Delete Meeting</span>
+                    </button>
+                  </>
+                )}
+                {isGoogle && (
+                  <div style={{ padding: '6px 10px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Google Calendar (Read-only)
+                  </div>
                 )}
               </div>
-
             )}
           </div>
         </div>

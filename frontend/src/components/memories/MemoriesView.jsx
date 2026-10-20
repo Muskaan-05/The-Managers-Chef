@@ -666,7 +666,7 @@ export default function MemoriesView({ onNavigate }) {
       try {
         setIsLoadingBackend(true);
         const results = await searchContext(searchQuery);
-        if (isCurrent && Array.isArray(results) && results.length > 0) {
+        if (isCurrent && Array.isArray(results)) {
           const mapped = results.map(mapContextItemToMemory);
           setBackendItems(mapped);
         }
@@ -684,12 +684,10 @@ export default function MemoriesView({ onNavigate }) {
     };
   }, [searchQuery]);
 
-  // Merge backend items with local memories
+  // Combined memories: use live backend items when authenticated
   const combinedMemories = useMemo(() => {
-    if (backendItems.length === 0) return memories;
-    const existingIds = new Set(backendItems.map((b) => b.id));
-    const localFiltered = memories.filter((m) => !existingIds.has(m.id));
-    return [...backendItems, ...localFiltered];
+    if (!getToken()) return memories;
+    return backendItems;
   }, [backendItems, memories]);
 
   // Persist to localStorage

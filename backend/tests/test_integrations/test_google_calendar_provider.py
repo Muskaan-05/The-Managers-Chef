@@ -112,3 +112,18 @@ def test_map_meet_link_fallback_location():
     assert mapped is not None
     assert mapped["location"] == "https://meet.google.com/xyz-1234-uvw"
 
+
+def test_duplicate_prevention_key_mapping():
+    """Ensure that recurring syncs produce matching google_event_id for deduplication."""
+    item = {
+        "id": "event_repeat_unique_id",
+        "status": "confirmed",
+        "summary": "Architecture Review",
+        "start": {"dateTime": "2026-10-22T14:00:00Z"},
+        "end": {"dateTime": "2026-10-22T15:00:00Z"},
+    }
+    mapped_first = map_google_event_to_dict(item)
+    mapped_second = map_google_event_to_dict(item)
+    assert mapped_first["google_event_id"] == mapped_second["google_event_id"] == "event_repeat_unique_id"
+
+

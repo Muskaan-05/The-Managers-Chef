@@ -278,6 +278,13 @@ export async function createMeeting(payload) {
   });
 }
 
+export async function updateMeeting(meetingId, updates) {
+  return await request(`/api/meetings/${meetingId}`, {
+    method: 'PATCH',
+    body: updates,
+  });
+}
+
 export async function deleteMeeting(meetingId) {
   return await request(`/api/meetings/${meetingId}`, {
     method: 'DELETE',

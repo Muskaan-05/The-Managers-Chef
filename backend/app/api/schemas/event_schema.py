@@ -35,6 +35,7 @@ class EventOut(BaseModel):
     location: Optional[str] = None
     participants: Optional[List[str]] = []
     source: Optional[str] = "manual"
+    google_event_id: Optional[str] = None
 
     class Config:
         from_attributes = True
