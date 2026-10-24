@@ -16,7 +16,10 @@ import {
   Trash2, 
   Sparkles,
   BookmarkCheck,
-  ListTodo
+  ListTodo,
+  RefreshCw,
+  Bot,
+  Square
 } from 'lucide-react';
 
 export default function MeetingDetailModal({
@@ -26,16 +29,23 @@ export default function MeetingDetailModal({
   onSaveMeetingNotes,
   onToggleFollowUp,
   onCreateFollowUpTask,
-  onJoinMeeting
+  onJoinMeeting,
+  onProcessAI,
+  onStartBot,
+  onEndMeeting
 }) {
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'notes'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'notes' | 'ai'
   const [notes, setNotes] = useState('');
   const [keyDecisions, setKeyDecisions] = useState([]);
   const [actionItems, setActionItems] = useState([]);
   const [newDecision, setNewDecision] = useState('');
   const [newActionItem, setNewActionItem] = useState('');
   const [copied, setCopied] = useState(false);
+  const [copiedTranscript, setCopiedTranscript] = useState(false);
   const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [isStartingBot, setIsStartingBot] = useState(false);
+  const [isEndingMeeting, setIsEndingMeeting] = useState(false);
 
   useEffect(() => {
     if (meeting) {
@@ -169,6 +179,19 @@ export default function MeetingDetailModal({
               {isCompleted && (
                 <span className="status-pill status-completed">Completed</span>
               )}
+              {meeting.rawStatus === 'bot_active' ? (
+                <span className="status-pill" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981', fontWeight: 600 }}>
+                  ● Bot Active Recording
+                </span>
+              ) : meeting.rawStatus === 'failed' ? (
+                <span className="status-pill" style={{ backgroundColor: '#fee2e2', color: '#b91c1c' }}>
+                  Bot Failed
+                </span>
+              ) : meeting.rawStatus === 'ended' ? (
+                <span className="status-pill status-completed">
+                  Bot Ended
+                </span>
+              ) : null}
             </div>
             <h3 className="modal-title">{meeting.title}</h3>
             <p className="modal-subtitle">
@@ -192,8 +215,21 @@ export default function MeetingDetailModal({
             className={`meeting-detail-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveTab('overview')}
           >
-            <Sparkles size={14} />
+            <Calendar size={14} />
             <span>Context & Prep</span>
+          </button>
+          <button
+            type="button"
+            className={`meeting-detail-tab-btn ${activeTab === 'ai' ? 'active' : ''}`}
+            onClick={() => setActiveTab('ai')}
+          >
+            <Sparkles size={14} />
+            <span>AI Intelligence & Summary</span>
+            {meeting.summary && (
+              <span className="filter-count-badge" style={{ marginLeft: 4, backgroundColor: 'var(--accent-primary)', color: '#fff' }}>
+                Ready
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -362,7 +398,138 @@ export default function MeetingDetailModal({
             </div>
           )}
 
-          {/* Tab 2: Notes & Decisions (for past meetings or active note-taking) */}
+          {/* Tab 2: AI Intelligence & Summary */}
+          {activeTab === 'ai' && (
+            <div className="meeting-detail-content">
+              {/* Bot & Pipeline Actions Bar */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16, alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Bot size={16} style={{ color: 'var(--accent-primary)' }} />
+                  <span style={{ fontSize: '13px', fontWeight: 600 }}>
+                    AI Pipeline & Bot Controller
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {/* Bot Launch / Stop Buttons */}
+                  {!meeting.isEvent && onStartBot && meeting.rawStatus !== 'bot_active' && !isCompleted && (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={isStartingBot}
+                      onClick={async () => {
+                        setIsStartingBot(true);
+                        try {
+                          await onStartBot(meeting);
+                        } finally {
+                          setIsStartingBot(false);
+                        }
+                      }}
+                      style={{ fontSize: '12.5px', padding: '6px 12px' }}
+                    >
+                      <Bot size={13} className={isStartingBot ? 'spin-icon' : ''} style={{ marginRight: 5 }} />
+                      <span>{isStartingBot ? 'Launching Bot...' : 'Launch AI Bot'}</span>
+                    </button>
+                  )}
+
+                  {!meeting.isEvent && onEndMeeting && meeting.rawStatus === 'bot_active' && (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={isEndingMeeting}
+                      onClick={async () => {
+                        setIsEndingMeeting(true);
+                        try {
+                          await onEndMeeting(meeting);
+                        } finally {
+                          setIsEndingMeeting(false);
+                        }
+                      }}
+                      style={{ fontSize: '12.5px', padding: '6px 12px', color: '#ef4444', borderColor: '#fca5a5' }}
+                    >
+                      <Square size={13} className={isEndingMeeting ? 'spin-icon' : ''} style={{ marginRight: 5 }} />
+                      <span>{isEndingMeeting ? 'Stopping Bot...' : 'End & Process'}</span>
+                    </button>
+                  )}
+
+                  {/* Run AI Processing */}
+                  {onProcessAI && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={isProcessingAI}
+                      onClick={async () => {
+                        setIsProcessingAI(true);
+                        try {
+                          await onProcessAI(meeting.id);
+                        } finally {
+                          setIsProcessingAI(false);
+                        }
+                      }}
+                      style={{ fontSize: '12.5px', padding: '6px 14px' }}
+                    >
+                      <Sparkles size={13} className={isProcessingAI ? 'spin-icon' : ''} style={{ marginRight: 5 }} />
+                      <span>{isProcessingAI ? 'Analyzing...' : 'Run AI Analysis'}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* AI Executive Summary */}
+              <div className="detail-section-block">
+                <span className="detail-block-title">
+                  <Sparkles size={13} style={{ color: 'var(--accent-primary)' }} />
+                  AI Executive Summary
+                </span>
+                {meeting.summary ? (
+                  <div className="detail-card-box" style={{ whiteSpace: 'pre-line', lineHeight: 1.6, backgroundColor: 'var(--accent-primary-light)', borderColor: 'var(--accent-primary-border)', color: 'var(--text-main)', fontSize: '13px' }}>
+                    {meeting.summary}
+                  </div>
+                ) : (
+                  <div className="detail-card-box" style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-muted)' }}>
+                    <Sparkles size={22} style={{ margin: '0 auto 8px', color: 'var(--accent-primary)', opacity: 0.8 }} />
+                    <p style={{ fontWeight: 500, color: 'var(--text-main)', marginBottom: 4, fontSize: '13px' }}>No AI Summary Available Yet</p>
+                    <p style={{ fontSize: '12px' }}>Click "Run AI Analysis" to summarize the transcript and automatically extract commitments and key decisions.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Ingested Transcript Viewer */}
+              <div className="detail-section-block">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="detail-block-title">
+                    <FileText size={13} />
+                    Meeting Transcript
+                  </span>
+                  {meeting.transcript && (
+                    <button
+                      type="button"
+                      className="btn-inline-add"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(meeting.transcript);
+                        setCopiedTranscript(true);
+                        setTimeout(() => setCopiedTranscript(false), 2000);
+                      }}
+                    >
+                      {copiedTranscript ? <Check size={11} style={{ marginRight: 3, color: '#10b981' }} /> : <Copy size={11} style={{ marginRight: 3 }} />}
+                      <span>{copiedTranscript ? 'Copied' : 'Copy Transcript'}</span>
+                    </button>
+                  )}
+                </div>
+                {meeting.transcript ? (
+                  <div className="detail-card-box" style={{ maxHeight: '220px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '11.5px', lineHeight: 1.5, backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-light)' }}>
+                    {meeting.transcript}
+                  </div>
+                ) : (
+                  <div className="detail-card-box" style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                    No transcript recorded. You can add one in the "Meeting Notes & Decisions" tab or launch the AI Meeting Bot during live calls.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tab 3: Notes & Decisions (for manual note-taking) */}
           {activeTab === 'notes' && (
             <div className="meeting-detail-content">
               {/* Meeting Notes */}

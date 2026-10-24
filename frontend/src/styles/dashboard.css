@@ -1122,3 +1122,81 @@ body {
     width: 68px;
   }
 }
+
+/* ==========================================================================
+   Loading Animations & Skeletons
+   ========================================================================== */
+
+@keyframes pulseSkeleton {
+  0% {
+    background-color: var(--bg-hover, #f1f5f9);
+  }
+  50% {
+    background-color: var(--border-light, #e2e8f0);
+  }
+  100% {
+    background-color: var(--bg-hover, #f1f5f9);
+  }
+}
+
+.skeleton {
+  animation: pulseSkeleton 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.skeleton-text {
+  height: 14px;
+  margin-bottom: 6px;
+  border-radius: 4px;
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 60%;
+  margin-bottom: 10px;
+}
+
+.skeleton-card {
+  padding: 18px;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-card, #ffffff);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Spinner Animation */
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin-icon {
+  animation: spinSlow 0.9s linear infinite;
+}
+
+/* Button Loading State */
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed !important;
+}
+
+/* Reduced Motion Preference */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .spin-icon {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -9,14 +9,18 @@ export default function TopSection({
   activeNav = "dashboard",
   onAddTask,
   onScheduleMeeting,
-  onAddEvent
+  onAddEvent,
+  onAddReminder
 }) {
-  const isTasksView     = activeNav === 'tasks';
-  const isMeetingsView  = activeNav === 'meetings';
-  const isEventsView    = activeNav === 'events';
-  const isMemoriesView  = activeNav === 'memories';
-  const isSettingsView  = activeNav === 'settings';
-  const isPageView      = isTasksView || isMeetingsView || isEventsView || isMemoriesView || isSettingsView;
+  const isTasksView       = activeNav === 'tasks';
+  const isMeetingsView    = activeNav === 'meetings';
+  const isEventsView      = activeNav === 'events';
+  const isCommitmentsView = activeNav === 'commitments';
+  const isDecisionsView   = activeNav === 'decisions';
+  const isRemindersView   = activeNav === 'reminders';
+  const isMemoriesView    = activeNav === 'memories';
+  const isSettingsView    = activeNav === 'settings';
+  const isPageView        = isTasksView || isMeetingsView || isEventsView || isCommitmentsView || isDecisionsView || isRemindersView || isMemoriesView || isSettingsView;
 
   const pageTitle = isTasksView
     ? 'Tasks'
@@ -24,6 +28,12 @@ export default function TopSection({
     ? 'Meetings'
     : isEventsView
     ? 'Events'
+    : isCommitmentsView
+    ? 'Commitments'
+    : isDecisionsView
+    ? 'Decisions'
+    : isRemindersView
+    ? 'Reminders'
     : isMemoriesView
     ? 'Memories'
     : isSettingsView
@@ -36,6 +46,12 @@ export default function TopSection({
     ? 'Stay prepared for what\'s next.'
     : isEventsView
     ? 'Manage your calendar schedules, appointments, and events.'
+    : isCommitmentsView
+    ? 'AI-tracked commitments, deliverables, and promises made in meetings.'
+    : isDecisionsView
+    ? 'Key agreements and architectural decisions captured from meetings.'
+    : isRemindersView
+    ? 'Manage your scheduled alerts and recurring notifications.'
     : isMemoriesView
     ? 'Find the context you need, when you need it.'
     : isSettingsView
@@ -89,7 +105,16 @@ export default function TopSection({
             <Plus size={16} />
             <span>Add Event</span>
           </button>
-        ) : (isMemoriesView || isSettingsView) ? (
+        ) : isRemindersView ? (
+          <button
+            type="button"
+            className="primary-add-task-btn"
+            onClick={onAddReminder}
+          >
+            <Plus size={16} />
+            <span>Add Reminder</span>
+          </button>
+        ) : (isCommitmentsView || isDecisionsView || isMemoriesView || isSettingsView) ? (
           null
         ) : (
           <div className="search-bar-wrapper">

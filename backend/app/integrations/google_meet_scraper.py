@@ -1,9 +1,9 @@
+import os
+import signal
 import subprocess
 import sys
-import signal
-import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 TRANSCRIPTS_DIR = Path("meeting_transcripts")
 TRANSCRIPTS_DIR.mkdir(exist_ok=True)
@@ -20,13 +20,15 @@ def start_bot(meet_link: str, meeting_id: str) -> Dict[str, Any]:
     return {"process_id": process.pid, "transcript_path": str(output_path)}
 
 
-def stop_bot(process_id: int, transcript_path: str) -> Optional[str]:
-    try:
-        os.kill(process_id, signal.SIGINT)
-    except (ProcessLookupError, PermissionError):
-        pass
-    path = Path(transcript_path)
-    if path.exists():
-        content = path.read_text(encoding="utf-8").strip()
-        return content if content else None
+def stop_bot(process_id: Optional[int] = None, transcript_path: Optional[str] = None) -> Optional[str]:
+    if process_id:
+        try:
+            os.kill(process_id, signal.SIGINT)
+        except (ProcessLookupError, PermissionError):
+            pass
+    if transcript_path:
+        path = Path(transcript_path)
+        if path.exists():
+            content = path.read_text(encoding="utf-8").strip()
+            return content if content else None
     return None

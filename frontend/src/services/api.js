@@ -404,3 +404,86 @@ export async function disconnectGoogle() {
   });
 }
 
+
+export async function getDecision(decisionId) {
+  return await request(`/api/decisions/${decisionId}`, { method: 'GET' });
+}
+
+export async function updateDecision(decisionId, updates) {
+  return await request(`/api/decisions/${decisionId}`, {
+    method: 'PATCH',
+    body: updates,
+  });
+}
+
+// -------------------------------------------------------------
+// Commitment Services
+// -------------------------------------------------------------
+
+export async function getCommitments(params = {}) {
+  const query = new URLSearchParams();
+  if (params.status) query.append('status', params.status);
+  if (params.context_id) query.append('context_id', params.context_id);
+  const qs = query.toString() ? `?${query.toString()}` : '';
+  const res = await request(`/api/commitments${qs}`, { method: 'GET' });
+  return res?.commitments || [];
+}
+
+export async function getCommitment(commitmentId) {
+  return await request(`/api/commitments/${commitmentId}`, { method: 'GET' });
+}
+
+export async function updateCommitment(commitmentId, updates) {
+  return await request(`/api/commitments/${commitmentId}`, {
+    method: 'PATCH',
+    body: updates,
+  });
+}
+
+export async function deleteCommitment(commitmentId) {
+  return await request(`/api/commitments/${commitmentId}`, {
+    method: 'DELETE',
+  });
+}
+
+// -------------------------------------------------------------
+// Reminder Services
+// -------------------------------------------------------------
+
+export async function getReminders(params = {}) {
+  const query = new URLSearchParams();
+  if (params.status) query.append('status', params.status);
+  const qs = query.toString() ? `?${query.toString()}` : '';
+  const res = await request(`/api/reminders${qs}`, { method: 'GET' });
+  return res?.reminders || [];
+}
+
+export async function createReminder(payload) {
+  return await request('/api/reminders', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function updateReminder(reminderId, updates) {
+  return await request(`/api/reminders/${reminderId}`, {
+    method: 'PATCH',
+    body: updates,
+  });
+}
+
+export async function deleteReminder(reminderId) {
+  return await request(`/api/reminders/${reminderId}`, {
+    method: 'DELETE',
+  });
+}
+
+// -------------------------------------------------------------
+// Meeting AI Pipeline Trigger
+// -------------------------------------------------------------
+
+export async function processMeetingAI(meetingId) {
+  return await request(`/api/meetings/${meetingId}/process`, {
+    method: 'POST',
+  });
+}

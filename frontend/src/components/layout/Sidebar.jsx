@@ -5,6 +5,9 @@ import {
   Calendar, 
   CalendarDays,
   CheckSquare, 
+  CheckCircle2,
+  BookmarkCheck,
+  Bell,
   Settings, 
   Sparkles,
   X,
@@ -21,6 +24,8 @@ export default function Sidebar({
   tasksBadge,
   meetingsBadge,
   eventsBadge,
+  commitmentsBadge,
+  remindersBadge,
   onLogout
 }) {
 
@@ -38,6 +43,23 @@ export default function Sidebar({
       label: 'Events', 
       icon: CalendarDays,
       badge: eventsBadge !== undefined ? (eventsBadge > 0 ? String(eventsBadge) : undefined) : undefined
+    },
+    { 
+      id: 'commitments', 
+      label: 'Commitments', 
+      icon: CheckCircle2,
+      badge: commitmentsBadge !== undefined ? (commitmentsBadge > 0 ? String(commitmentsBadge) : undefined) : undefined
+    },
+    { 
+      id: 'decisions', 
+      label: 'Decisions', 
+      icon: BookmarkCheck,
+    },
+    { 
+      id: 'reminders', 
+      label: 'Reminders', 
+      icon: Bell,
+      badge: remindersBadge !== undefined ? (remindersBadge > 0 ? String(remindersBadge) : undefined) : undefined
     },
     { 
       id: 'tasks', 
@@ -107,7 +129,7 @@ export default function Sidebar({
                     <Icon className="nav-icon" size={18} />
                     <span className="nav-label">{item.label}</span>
                     {item.badge && (
-                      <span className={`nav-badge ${isActive ? 'badge-active' : ''}`}>
+                      <span className={`nav-badge ${item.badge.includes('new') ? 'badge-new' : ''}`}>
                         {item.badge}
                       </span>
                     )}
@@ -118,46 +140,28 @@ export default function Sidebar({
           </ul>
         </nav>
 
-        {/* Calm Context Pill / Hint */}
-        <div className="sidebar-context-status">
-          <div className="context-indicator">
-            <span className="status-ping" />
-            <span className="status-text">Context Synced</span>
+        {/* User Profile Mini Footer */}
+        <div className="sidebar-footer">
+          <div className="user-profile-summary">
+            <div className="user-avatar-initials">
+              {user?.avatarInitials || 'EM'}
+            </div>
+            <div className="user-meta-group">
+              <span className="user-full-name">{user?.name || 'Alex Morgan'}</span>
+              <span className="user-designation">{user?.role || 'Engineering Manager'}</span>
+            </div>
+            {onLogout && (
+              <button 
+                type="button" 
+                className="sidebar-logout-btn" 
+                onClick={onLogout}
+                title="Log out of session"
+                aria-label="Log out"
+              >
+                <LogOut size={16} />
+              </button>
+            )}
           </div>
-          <p className="context-note">
-            Ingesting calendar & meeting transcripts
-          </p>
-        </div>
-
-        {/* User Profile Section at bottom */}
-        <div className="sidebar-profile">
-          <div className="profile-avatar">
-            {user?.avatarInitials || 'MG'}
-          </div>
-          <div className="profile-info" style={{ flex: 1 }}>
-            <span className="profile-name">{user?.name || 'Alex Morgan'}</span>
-            <span className="profile-role">{user?.role || 'Engineering Manager'}</span>
-          </div>
-          <button
-            type="button"
-            className="sidebar-logout-btn"
-            onClick={onLogout ? onLogout : () => handleNavClick('landing')}
-            title="Sign Out to Landing Page"
-
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              padding: '6px',
-              borderRadius: 'var(--radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <LogOut size={16} />
-          </button>
         </div>
       </aside>
     </>

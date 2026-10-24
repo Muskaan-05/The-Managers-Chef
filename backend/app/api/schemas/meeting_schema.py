@@ -1,4 +1,4 @@
-from pydantic import BaseModel, AnyUrl, HttpUrl
+from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -75,8 +75,19 @@ class MeetingBriefResponse(BaseModel):
 
 
 class JoinMeetingRequest(BaseModel):
-    meet_link: str
+    meet_link: Optional[str] = None
 
 
 class JoinMeetingResponse(BaseModel):
     status: str
+    bot_pid: Optional[int] = None
+    meet_link: Optional[str] = None
+    message: Optional[str] = None
+
+
+class MeetingProcessResponse(BaseModel):
+    status: str
+    meeting_id: str
+    summary: str
+    decisions: List[str] = []
+    commitments: List[dict] = []

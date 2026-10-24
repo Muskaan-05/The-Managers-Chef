@@ -9,10 +9,13 @@ from app.models.user import User
 from app.services.decision_service import (
     create_decision,
     list_decisions,
+    get_decision,
+    update_decision,
     delete_decision,
 )
 from app.api.schemas.decision_schema import (
     DecisionCreate,
+    DecisionUpdate,
     DecisionOut,
     DecisionListOut,
 )
@@ -47,6 +50,38 @@ def create_decision_route(
         meeting_id=payload.meeting_id,
         source="manual",
     )
+
+
+@router.get("/{decision_id}", response_model=DecisionOut)
+def get_decision_route(
+    decision_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    decision = get_decision(db, current_user.id, decision_id)
+    if not decision:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    return decision
+
+
+@router.patch("/{decision_id}", response_model=DecisionOut)
+@router.put("/{decision_id}", response_model=DecisionOut)
+def update_decision_route(
+    decision_id: UUID,
+    payload: DecisionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    updated = update_decision(
+        db=db,
+        user_id=current_user.id,
+        decision_id=decision_id,
+        decision_text=payload.decision,
+        context_id=payload.context_id,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    return updated
 
 
 @router.delete("/{decision_id}")

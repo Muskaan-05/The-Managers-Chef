@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -29,8 +29,7 @@ class ReminderOut(BaseModel):
     source: Optional[str] = "manual"
     status: str = "pending"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ReminderListOut(BaseModel):

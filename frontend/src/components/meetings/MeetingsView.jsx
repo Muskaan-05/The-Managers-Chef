@@ -19,7 +19,9 @@ import {
   getDecisions,
   createDecision,
   submitMeetingTranscript,
-  joinMeeting
+  joinMeeting,
+  endMeeting,
+  processMeetingAI
 } from '../../services/api';
 import { formatDisplayDate, parseMeetingTimes, isMeetingEntry } from '../../utils/dateUtils';
 import { Check, RefreshCw, AlertCircle } from 'lucide-react';
@@ -80,6 +82,8 @@ export default function MeetingsView({
       rawStatus: m.status,
       needsFollowUp: false,
       agenda: m.summary || m.transcript || 'Review milestones and sync on updates.',
+      summary: m.summary || '',
+      transcript: m.transcript || '',
       previousContext: m.summary ? `Summary: ${m.summary.slice(0, 150)}...` : '',
       relatedMemories: [],
       relatedTasks: [],
@@ -340,6 +344,54 @@ export default function MeetingsView({
     }
   };
 
+  const handleProcessAI = async (meetingId) => {
+    try {
+      showToast('Running AI summary & extraction pipeline...');
+      const result = await processMeetingAI(meetingId);
+      showToast('AI intelligence pipeline completed successfully!');
+      await fetchMeetingsAndEvents();
+      if (selectedDetailMeeting && selectedDetailMeeting.id === meetingId) {
+        setSelectedDetailMeeting((prev) => ({
+          ...prev,
+          summary: result?.summary || prev.summary,
+          agenda: result?.summary || prev.agenda,
+        }));
+      }
+      return result;
+    } catch (err) {
+      showToast(`AI Processing error: ${err.message || 'Pipeline failed'}`);
+      throw err;
+    }
+  };
+
+  const handleStartBot = async (meeting) => {
+    try {
+      showToast('Launching background meeting bot...');
+      await joinMeeting(meeting.id, meeting.meetingLink);
+      showToast('Meeting bot launched in background.');
+      await fetchMeetingsAndEvents();
+      if (selectedDetailMeeting && selectedDetailMeeting.id === meeting.id) {
+        setSelectedDetailMeeting((prev) => ({ ...prev, rawStatus: 'bot_active' }));
+      }
+    } catch (err) {
+      showToast(`Bot error: ${err.message}`);
+    }
+  };
+
+  const handleEndMeeting = async (meeting) => {
+    try {
+      showToast('Ending meeting & running AI processing...');
+      await endMeeting(meeting.id);
+      showToast('Meeting ended and processed.');
+      await fetchMeetingsAndEvents();
+      if (selectedDetailMeeting && selectedDetailMeeting.id === meeting.id) {
+        setSelectedDetailMeeting((prev) => ({ ...prev, rawStatus: 'ended', isPast: true }));
+      }
+    } catch (err) {
+      showToast(`Error: ${err.message}`);
+    }
+  };
+
   const handleCreateFollowUpTask = async (meetingId, newTask) => {
     try {
       const contextId = await ensureDefaultContext();
@@ -470,6 +522,9 @@ export default function MeetingsView({
         onToggleFollowUp={handleToggleFollowUp}
         onCreateFollowUpTask={(meeting) => setFollowUpTaskMeeting(meeting)}
         onJoinMeeting={(meeting) => setJoiningMeeting(meeting)}
+        onProcessAI={handleProcessAI}
+        onStartBot={handleStartBot}
+        onEndMeeting={handleEndMeeting}
       />
 
       {/* Join Meeting Interface / Modal */}

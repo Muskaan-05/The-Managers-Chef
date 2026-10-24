@@ -36,7 +36,7 @@ export default function AiBriefSection({ items = [] }) {
           <h2 className="ai-brief-heading">Your AI Brief</h2>
         </div>
         <div className="ai-brief-meta">
-          <span className="ai-brief-timestamp">Curated for today • 4 items</span>
+          <span className="ai-brief-timestamp">Curated for today</span>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import Optional
 from uuid import UUID
@@ -26,8 +26,10 @@ from app.api.schemas.meeting_schema import (
     MeetingSummaryOut,
     JoinMeetingRequest,
     JoinMeetingResponse,
+    MeetingProcessResponse,
 )
-from app.integrations.google_meet_scraper import start_bot, stop_bot
+from app.services.scraper_service import background_bot_session, end_meeting_and_process_sync
+from app.services.ai_pipeline_service import process_meeting_transcript
 from app.config import settings
 
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
@@ -71,6 +73,15 @@ def create_meeting_route(
     )
 
 
+@router.get("/{meeting_id}", response_model=MeetingOut)
+def get_meeting_route(
+    meeting_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return get_meeting_or_404(db, meeting_id, current_user.id)
+
+
 @router.post("/{meeting_id}/transcript")
 def submit_transcript(
     meeting_id: UUID,
@@ -84,37 +95,82 @@ def submit_transcript(
     return meeting
 
 
-@router.post("/{meeting_id}/summarize", response_model=MeetingSummaryOut)
+@router.post("/{meeting_id}/summarize")
 def summarize(
     meeting_id: UUID,
     payload: TranscriptPayload,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Store transcript first, then create a basic summary placeholder
-    update_meeting_transcript(db, current_user.id, meeting_id, payload.transcript)
-    summary = f"Meeting transcript received ({len(payload.transcript)} chars). AI summarisation requires Developer A AI service."
-    meeting = update_meeting_summary(db, current_user.id, meeting_id, summary)
-    if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
-    return {"summary": summary}
+    """
+    Submits transcript and processes it through the full AI intelligence pipeline
+    (summary, commitments, and decisions extraction).
+    """
+    meeting = get_meeting_or_404(db, meeting_id, current_user.id)
+    result = process_meeting_transcript(
+        db=db,
+        user_id=current_user.id,
+        meeting_id=meeting_id,
+        transcript=payload.transcript,
+        force_reprocess=True,
+    )
+    return result
+
+
+@router.post("/{meeting_id}/process", response_model=MeetingProcessResponse)
+def process_meeting_route(
+    meeting_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Triggers or retries AI meeting processing on existing meeting transcript idempotently.
+    """
+    meeting = get_meeting_or_404(db, meeting_id, current_user.id)
+    result = process_meeting_transcript(
+        db=db,
+        user_id=current_user.id,
+        meeting_id=meeting_id,
+        force_reprocess=True,
+    )
+    return result
 
 
 @router.post("/{meeting_id}/join", response_model=JoinMeetingResponse)
 def join_meeting(
     meeting_id: UUID,
     payload: JoinMeetingRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     meeting = get_meeting_or_404(db, meeting_id, current_user.id)
+    if meeting.status == "bot_active":
+        return {
+            "status": "already_active",
+            "bot_pid": meeting.bot_process_id,
+            "meet_link": meeting.meet_link,
+            "message": "Meeting capture bot is already running for this meeting.",
+        }
+
     meet_link = payload.meet_link or meeting.meet_link or settings.MOCK_MEET_LINK
-    try:
-        pid = start_bot(meet_link)
-        update_bot_details(db, current_user.id, meeting_id, bot_process_id=pid, status="active")
-        return {"status": "joined", "bot_pid": pid, "meet_link": meet_link}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    if not meet_link:
+        raise HTTPException(status_code=400, detail="No conference meet link provided or found on meeting")
+
+    # Launch bot in non-blocking background task
+    background_tasks.add_task(
+        background_bot_session,
+        meeting_id=meeting_id,
+        user_id=current_user.id,
+        meet_link=meet_link,
+    )
+
+    update_bot_details(db, current_user.id, meeting_id, status="bot_active")
+    return {
+        "status": "joining",
+        "meet_link": meet_link,
+        "message": "Background capture bot queued.",
+    }
 
 
 @router.post("/{meeting_id}/end")
@@ -124,12 +180,11 @@ def end_meeting(
     db: Session = Depends(get_db),
 ):
     meeting = get_meeting_or_404(db, meeting_id, current_user.id)
-    try:
-        stop_bot(meeting.bot_process_id)
-    except Exception:
-        pass
-    update_bot_details(db, current_user.id, meeting_id, status="ended")
-    return {"status": "ended"}
+    result = end_meeting_and_process_sync(db, current_user.id, meeting_id)
+    return {
+        "status": "ended",
+        "processing": result,
+    }
 
 
 @router.patch("/{meeting_id}", response_model=MeetingOut)

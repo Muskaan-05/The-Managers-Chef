@@ -7,6 +7,9 @@ import UpcomingSection from './components/dashboard/UpcomingSection';
 import TasksView from './components/tasks/TasksView';
 import MeetingsView from './components/meetings/MeetingsView';
 import EventsView from './components/events/EventsView';
+import CommitmentsView from './components/commitments/CommitmentsView';
+import DecisionsView from './components/decisions/DecisionsView';
+import RemindersView from './components/reminders/RemindersView';
 import MemoriesView from './components/memories/MemoriesView';
 import SettingsView from './components/settings/SettingsView';
 import LandingPage from './components/landing/LandingPage';
@@ -23,9 +26,11 @@ import {
   getStoredUser, 
   getMe, 
   logout, 
-  getDashboard 
+  getDashboard,
+  getReminders
 } from './services/api';
 import { formatDisplayDate } from './utils/dateUtils';
+import { playNotificationSound } from './utils/soundUtils';
 import { AlertCircle, CheckCircle2, X } from 'lucide-react';
 import './styles/dashboard.css';
 
@@ -68,12 +73,88 @@ function App() {
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
   const [eventsBadgeCount, setEventsBadgeCount] = useState(undefined);
 
+  // Commitments page state
+  const [commitmentsBadgeCount, setCommitmentsBadgeCount] = useState(undefined);
+
+  // Reminders page state
+  const [isAddReminderModalOpen, setIsAddReminderModalOpen] = useState(false);
+  const [remindersBadgeCount, setRemindersBadgeCount] = useState(undefined);
+
   const showToast = (message, isError = false) => {
     setToast({ message, isError });
     setTimeout(() => {
       setToast((curr) => (curr?.message === message ? null : curr));
     }, 4500);
   };
+
+  // Reminder alert scheduler loop: periodically check due reminders, sound chime, in-app toast, browser notification
+  useEffect(() => {
+    if (!getToken()) return;
+
+    // Load already notified IDs from sessionStorage to prevent duplicate alerts on refresh/tab switch
+    const getNotifiedIds = () => {
+      try {
+        const stored = sessionStorage.getItem('tmc_notified_reminder_ids');
+        return stored ? new Set(JSON.parse(stored)) : new Set();
+      } catch {
+        return new Set();
+      }
+    };
+
+    const saveNotifiedIds = (idSet) => {
+      try {
+        sessionStorage.setItem('tmc_notified_reminder_ids', JSON.stringify([...idSet]));
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    const checkReminders = async () => {
+      try {
+        const reminders = await getReminders({ status: 'pending' });
+        if (!Array.isArray(reminders)) return;
+        
+        setRemindersBadgeCount(reminders.length);
+
+        const notifiedSet = getNotifiedIds();
+        const now = new Date();
+
+        reminders.forEach((r) => {
+          if (!r.trigger_time) return;
+          const triggerDate = new Date(r.trigger_time);
+          if (triggerDate <= now && !notifiedSet.has(r.id)) {
+            // New due reminder
+            notifiedSet.add(r.id);
+            saveNotifiedIds(notifiedSet);
+
+            // Synthesize sound chime
+            playNotificationSound();
+
+            // In-app toast
+            showToast(`⏰ Reminder: ${r.title}`);
+
+            // Browser push notification if permitted
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification(`Reminder: ${r.title}`, {
+                  body: r.description || 'You have a scheduled reminder due now.',
+                  icon: '/favicon.ico',
+                });
+              } catch (e) {
+                console.warn('Browser notification failed:', e);
+              }
+            }
+          }
+        });
+      } catch (err) {
+        // silent fail on background check
+      }
+    };
+
+    checkReminders();
+    const interval = setInterval(checkReminders, 25000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Check URL query parameters (e.g. Google OAuth callback) and validate session
   useEffect(() => {
@@ -440,6 +521,37 @@ function App() {
       );
     }
 
+    if (activeNav === 'commitments') {
+      return (
+        <CommitmentsView
+          onNavigateToMeeting={(meetingId) => {
+            setActiveNav('meetings');
+          }}
+          onCommitmentsCountChange={setCommitmentsBadgeCount}
+        />
+      );
+    }
+
+    if (activeNav === 'decisions') {
+      return (
+        <DecisionsView
+          onNavigateToMeeting={(meetingId) => {
+            setActiveNav('meetings');
+          }}
+        />
+      );
+    }
+
+    if (activeNav === 'reminders') {
+      return (
+        <RemindersView
+          isAddModalOpen={isAddReminderModalOpen}
+          setIsAddModalOpen={setIsAddReminderModalOpen}
+          onRemindersCountChange={setRemindersBadgeCount}
+        />
+      );
+    }
+
     if (activeNav === 'memories') {
       return (
         <MemoriesView
@@ -527,6 +639,8 @@ function App() {
         tasksBadge={tasksBadgeCount}
         meetingsBadge={meetingsBadgeCount}
         eventsBadge={eventsBadgeCount}
+        commitmentsBadge={commitmentsBadgeCount}
+        remindersBadge={remindersBadgeCount}
         onLogout={handleLogout}
       />
 
@@ -542,6 +656,7 @@ function App() {
           onAddTask={() => setIsAddTaskModalOpen(true)}
           onScheduleMeeting={() => setIsScheduleMeetingModalOpen(true)}
           onAddEvent={() => setIsAddEventModalOpen(true)}
+          onAddReminder={() => setIsAddReminderModalOpen(true)}
         />
 
         {/* Main Workspace */}

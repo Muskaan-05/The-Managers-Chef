@@ -6,9 +6,11 @@ from uuid import UUID
 from app.database.session import get_db
 from app.auth.dependencies import get_current_user
 from app.models.user import User
+from app.models.commitment import Commitment
 from app.services.commitment_service import (
     create_commitment,
     list_commitments as svc_list_commitments,
+    get_commitment,
     update_commitment_status,
     delete_commitment,
 )
@@ -53,29 +55,34 @@ def create_commitment_route(
     )
 
 
+@router.get("/{commitment_id}", response_model=CommitmentOut)
+def get_commitment_route(
+    commitment_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    commitment = get_commitment(db, current_user.id, commitment_id)
+    if not commitment:
+        raise HTTPException(status_code=404, detail="Commitment not found")
+    return commitment
+
+
 @router.patch("/{commitment_id}", response_model=CommitmentOut)
+@router.put("/{commitment_id}", response_model=CommitmentOut)
 def update_commitment_route(
     commitment_id: UUID,
     payload: CommitmentUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    data = payload.model_dump(exclude_unset=True)
-    if "status" in data:
-        result = update_commitment_status(db, current_user.id, commitment_id, data["status"])
-        if not result:
-            raise HTTPException(status_code=404, detail="Commitment not found")
-        return result
-    # If other fields need updating, do it directly
-    from app.models.commitment import Commitment
-    commitment = db.query(Commitment).filter(
-        Commitment.id == commitment_id,
-        Commitment.user_id == current_user.id,
-    ).first()
+    commitment = get_commitment(db, current_user.id, commitment_id)
     if not commitment:
         raise HTTPException(status_code=404, detail="Commitment not found")
+
+    data = payload.model_dump(exclude_unset=True)
     for field, value in data.items():
         setattr(commitment, field, value)
+
     db.commit()
     db.refresh(commitment)
     return commitment

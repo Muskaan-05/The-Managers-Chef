@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -36,6 +36,7 @@ class CommitmentUpdate(BaseModel):
     person: Optional[str] = None
     task: Optional[str] = None
     deadline: Optional[datetime] = None
+    context_id: Optional[UUID] = None
 
 
 class CommitmentOut(BaseModel):
@@ -50,8 +51,7 @@ class CommitmentOut(BaseModel):
     confidence: float = 1.0
     status: str = "pending"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CommitmentListOut(BaseModel):
