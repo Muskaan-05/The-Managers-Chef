@@ -1,30 +1,29 @@
 import os
 
 from dotenv import load_dotenv
-from huggingface_hub import InferenceClient
+from groq import Groq
 
 load_dotenv()
 
 
 class LLMClient:
-    """Wrapper around Hugging Face Inference Providers."""
+    """Wrapper around Groq's GPT-OSS 120B model."""
 
     def __init__(self, model: str | None = None):
-        api_key = os.getenv("HF_TOKEN")
+        api_key = os.getenv("GROQ_API_KEY")
 
         if not api_key:
             raise RuntimeError(
-                "HF_TOKEN is not set in the .env file"
+                "GROQ_API_KEY is not set in the .env file"
             )
 
         self.model = model or os.getenv(
-            "HF_MODEL",
+            "GROQ_MODEL",
             "openai/gpt-oss-120b",
         )
 
-        self.client = InferenceClient(
+        self.client = Groq(
             api_key=api_key,
-            provider="auto",
         )
 
     def generate(
@@ -46,8 +45,15 @@ class LLMClient:
                     "content": user_prompt,
                 },
             ],
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
             temperature=temperature,
         )
 
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+
+        if not content:
+            raise RuntimeError(
+                "Groq returned an empty response"
+            )
+
+        return content.strip()
