@@ -18,6 +18,7 @@ from app.api.routes import (
     context,
     dashboard,
     integrations,
+    ask_chef,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ app.include_router(reminders.router)
 app.include_router(context.router)
 app.include_router(dashboard.router)
 app.include_router(integrations.router)
+app.include_router(ask_chef.router)
 
 
 @app.get("/health")
