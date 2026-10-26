@@ -40,12 +40,18 @@ class HindsightService:
         self,
         content: str,
         context: str | None = None,
+        document_id: str | None = None,
         metadata: dict[str, str] | None = None,
         timestamp: Any | None = None,
         tags: list[str] | None = None,
+        update_mode: str | None = None,
     ):
         """
-        Store information in the Ask Chef memory bank.
+        Store or update information in the Ask Chef memory bank.
+
+        document_id provides a stable identifier so the same
+        source record can be updated instead of creating an
+        unrelated memory each time the meeting is reprocessed.
         """
 
         if not content or not content.strip():
@@ -55,9 +61,11 @@ class HindsightService:
             bank_id=self.bank_id,
             content=content.strip(),
             context=context,
+            document_id=document_id,
             metadata=metadata,
             timestamp=timestamp,
             tags=tags,
+            update_mode=update_mode,
         )
 
     def recall(
@@ -66,6 +74,7 @@ class HindsightService:
         max_tokens: int = 4096,
         budget: str = "mid",
         tags: list[str] | None = None,
+        types: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Retrieve relevant memories for an Ask Chef query.
@@ -77,6 +86,7 @@ class HindsightService:
         response = self.client.recall(
             bank_id=self.bank_id,
             query=query.strip(),
+            types=types,
             max_tokens=max_tokens,
             budget=budget,
             tags=tags,

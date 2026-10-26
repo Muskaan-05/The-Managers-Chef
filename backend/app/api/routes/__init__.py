@@ -9,4 +9,5 @@ from app.api.routes import (
     context,
     dashboard,
     integrations,
+    ask_chef,
 )
