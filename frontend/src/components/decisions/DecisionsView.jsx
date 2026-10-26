@@ -118,7 +118,10 @@ export default function DecisionsView({ onNavigateToMeeting }) {
         alignItems: 'center',
         gap: '12px',
         fontSize: '13px',
-        color: 'var(--text-main)'
+        color: 'var(--text-main)',
+        boxSizing: 'border-box',
+        width: '100%',
+        maxWidth: '100%'
       }}>
         <Sparkles size={18} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
         <span>
@@ -223,9 +226,12 @@ export default function DecisionsView({ onNavigateToMeeting }) {
                   alignItems: 'flex-start',
                   justifyContent: 'space-between',
                   gap: '16px',
+                  boxSizing: 'border-box',
+                  width: '100%',
+                  minWidth: 0,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
                   <div style={{
                     width: 24,
                     height: 24,
@@ -241,13 +247,15 @@ export default function DecisionsView({ onNavigateToMeeting }) {
                     <CheckCircle2 size={16} />
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0, flex: 1 }}>
                     <p style={{
                       fontSize: '15px',
                       color: 'var(--text-main)',
                       fontWeight: 600,
                       margin: 0,
-                      lineHeight: 1.4
+                      lineHeight: 1.4,
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere'
                     }}>
                       {d.decision}
                     </p>

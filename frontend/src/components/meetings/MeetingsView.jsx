@@ -81,6 +81,9 @@ export default function MeetingsView({
       meetingLink: m.meet_link || '',
       status: computedStatus,
       rawStatus: m.status,
+      ai_status: m.ai_status || 'pending',
+      ai_processed_at: m.ai_processed_at || null,
+      ai_error: m.ai_error || null,
       needsFollowUp: false,
       agenda: m.summary || m.transcript || 'Review milestones and sync on updates.',
       summary: m.summary || '',
@@ -415,6 +418,23 @@ export default function MeetingsView({
     }
   };
 
+  const handleRefreshMeeting = useCallback((updatedMeeting) => {
+    if (!updatedMeeting || !updatedMeeting.id) return;
+    setMeetings((prev) =>
+      prev.map((m) =>
+        m.id === updatedMeeting.id
+          ? {
+              ...m,
+              summary: updatedMeeting.summary !== undefined ? updatedMeeting.summary : m.summary,
+              transcript: updatedMeeting.transcript !== undefined ? updatedMeeting.transcript : m.transcript,
+              ai_status: updatedMeeting.ai_status !== undefined ? updatedMeeting.ai_status : m.ai_status,
+              rawStatus: updatedMeeting.status !== undefined ? updatedMeeting.status : m.rawStatus,
+            }
+          : m
+      )
+    );
+  }, []);
+
   const handleCreateFollowUpTask = async (meetingId, newTask) => {
     try {
       const contextId = await ensureDefaultContext();
@@ -548,22 +568,28 @@ export default function MeetingsView({
         onProcessAI={handleProcessAI}
         onStartBot={handleStartBot}
         onEndMeeting={handleEndMeeting}
+        onRefreshMeeting={handleRefreshMeeting}
       />
 
       {/* Join Meeting Interface / Modal */}
       <JoinMeetingModal
         isOpen={Boolean(joiningMeeting)}
         onClose={() => setJoiningMeeting(null)}
+        onStartBot={handleStartBot}
         task={
           joiningMeeting
             ? {
                 title: joiningMeeting.title,
                 meeting: {
+                  id: joiningMeeting.id,
+                  isEvent: Boolean(joiningMeeting.isEvent),
                   title: joiningMeeting.title,
                   link: joiningMeeting.meetingLink,
                   time: joiningMeeting.timeLabel || `${joiningMeeting.date} · ${joiningMeeting.time}`,
                   attendees: joiningMeeting.participants?.join(', ') || 'Participants',
                   agenda: joiningMeeting.agenda || 'Meeting sync',
+                  rawStatus: joiningMeeting.rawStatus,
+                  clientProject: joiningMeeting.clientProject,
                 },
               }
             : null

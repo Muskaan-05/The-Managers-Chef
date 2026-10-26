@@ -6,7 +6,8 @@ import {
   createEvent, 
   updateEvent, 
   deleteEvent, 
-  ensureDefaultContext 
+  ensureDefaultContext,
+  launchBotForEvent
 } from '../../services/api';
 import { formatDisplayDate, isMeetingEntry } from '../../utils/dateUtils';
 import { 
@@ -216,6 +217,17 @@ export default function EventsView({
       showToast(`Event "${event.title}" deleted.`);
     } catch (err) {
       showToast(`Error: ${err.message || 'Failed to delete event'}`);
+    }
+  };
+
+  const handleJoinBotForEvent = async (event) => {
+    try {
+      showToast('Launching AI Meeting Bot for event...');
+      const res = await launchBotForEvent(event.id);
+      showToast(res?.message || 'AI Meeting Bot successfully queued.');
+      fetchEvents();
+    } catch (err) {
+      showToast(`Bot error: ${err.message || 'Failed to launch bot'}`);
     }
   };
 
@@ -448,6 +460,7 @@ export default function EventsView({
                     event={event}
                     onEdit={handleEditClick}
                     onDelete={handleDeleteEvent}
+                    onJoinBot={handleJoinBotForEvent}
                   />
                 ))}
               </div>
@@ -468,6 +481,7 @@ export default function EventsView({
                     event={event}
                     onEdit={handleEditClick}
                     onDelete={handleDeleteEvent}
+                    onJoinBot={handleJoinBotForEvent}
                   />
                 ))}
               </div>

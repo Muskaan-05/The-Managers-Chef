@@ -271,6 +271,10 @@ export async function getMeetings(params = {}) {
   return res?.meetings || [];
 }
 
+export async function getMeeting(meetingId) {
+  return await request(`/api/meetings/${meetingId}`, { method: 'GET' });
+}
+
 export async function createMeeting(payload) {
   return await request('/api/meetings', {
     method: 'POST',
@@ -424,6 +428,7 @@ export async function getCommitments(params = {}) {
   const query = new URLSearchParams();
   if (params.status) query.append('status', params.status);
   if (params.context_id) query.append('context_id', params.context_id);
+  if (params.meeting_id) query.append('meeting_id', params.meeting_id);
   const qs = query.toString() ? `?${query.toString()}` : '';
   const res = await request(`/api/commitments${qs}`, { method: 'GET' });
   return res?.commitments || [];

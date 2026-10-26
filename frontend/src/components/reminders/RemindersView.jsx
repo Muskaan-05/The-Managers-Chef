@@ -410,10 +410,13 @@ export default function RemindersView({
                   alignItems: 'flex-start',
                   justifyContent: 'space-between',
                   gap: '16px',
-                  opacity: isDone ? 0.78 : 1
+                  opacity: isDone ? 0.78 : 1,
+                  boxSizing: 'border-box',
+                  width: '100%',
+                  minWidth: 0,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
                   <button
                     type="button"
                     onClick={() => handleToggleStatus(r)}
@@ -430,7 +433,7 @@ export default function RemindersView({
                     <CheckCircle2 size={20} />
                   </button>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0, flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span className={`status-pill ${isDue ? 'status-urgent' : isDone ? 'status-completed' : 'status-today'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <Clock size={11} />
@@ -455,13 +458,15 @@ export default function RemindersView({
                       color: 'var(--text-main)',
                       fontWeight: 600,
                       margin: 0,
-                      textDecoration: isDone ? 'line-through' : 'none'
+                      textDecoration: isDone ? 'line-through' : 'none',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere'
                     }}>
                       {r.title}
                     </h4>
 
                     {r.description && (
-                      <p style={{ fontSize: '13px', color: 'var(--text-body)', margin: 0, lineHeight: 1.4 }}>
+                      <p style={{ fontSize: '13px', color: 'var(--text-body)', margin: 0, lineHeight: 1.4, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         {r.description}
                       </p>
                     )}

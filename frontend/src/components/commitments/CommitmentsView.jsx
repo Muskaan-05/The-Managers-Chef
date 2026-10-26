@@ -155,7 +155,10 @@ export default function CommitmentsView({ onNavigateToMeeting, onCommitmentsCoun
         alignItems: 'center',
         gap: '12px',
         fontSize: '13px',
-        color: 'var(--text-main)'
+        color: 'var(--text-main)',
+        boxSizing: 'border-box',
+        width: '100%',
+        maxWidth: '100%'
       }}>
         <Sparkles size={18} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
         <span>
@@ -281,10 +284,13 @@ export default function CommitmentsView({ onNavigateToMeeting, onCommitmentsCoun
                   alignItems: 'flex-start',
                   justifyContent: 'space-between',
                   gap: '16px',
-                  opacity: isDone ? 0.78 : 1
+                  opacity: isDone ? 0.78 : 1,
+                  boxSizing: 'border-box',
+                  width: '100%',
+                  minWidth: 0,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: 0 }}>
                   <button
                     type="button"
                     onClick={() => handleStatusToggle(c)}
@@ -301,7 +307,7 @@ export default function CommitmentsView({ onNavigateToMeeting, onCommitmentsCoun
                     <CheckCircle2 size={20} />
                   </button>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0, flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <span className="status-pill status-today" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <User size={12} />
@@ -325,7 +331,9 @@ export default function CommitmentsView({ onNavigateToMeeting, onCommitmentsCoun
                       color: 'var(--text-main)',
                       fontWeight: 500,
                       margin: 0,
-                      textDecoration: isDone ? 'line-through' : 'none'
+                      textDecoration: isDone ? 'line-through' : 'none',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere'
                     }}>
                       {c.task}
                     </p>

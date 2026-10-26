@@ -86,7 +86,19 @@ export default function MeetingCard({
                 <span>Needs Follow-up</span>
               </span>
             )}
-            {isPast ? (
+            {meeting.rawStatus === 'bot_active' ? (
+              <span className="status-pill" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981', fontWeight: 600 }}>
+                ● Bot Active
+              </span>
+            ) : meeting.ai_status === 'processing' ? (
+              <span className="status-pill" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', border: '1px solid #3b82f6', fontWeight: 600 }}>
+                ● AI Processing
+              </span>
+            ) : meeting.ai_status === 'completed' ? (
+              <span className="status-pill status-completed">
+                AI Ready
+              </span>
+            ) : isPast ? (
               <span className="status-pill status-completed">
                 Past
               </span>

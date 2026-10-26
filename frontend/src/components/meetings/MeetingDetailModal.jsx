@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   X, 
   Video, 
@@ -19,8 +19,19 @@ import {
   ListTodo,
   RefreshCw,
   Bot,
-  Square
+  Square,
+  CheckCircle2,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
+import { 
+  getMeeting, 
+  getDecisions, 
+  getCommitments, 
+  joinMeeting, 
+  launchBotForEvent, 
+  processMeetingAI 
+} from '../../services/api';
 
 export default function MeetingDetailModal({
   isOpen,
@@ -32,7 +43,8 @@ export default function MeetingDetailModal({
   onJoinMeeting,
   onProcessAI,
   onStartBot,
-  onEndMeeting
+  onEndMeeting,
+  onRefreshMeeting
 }) {
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'notes' | 'ai'
   const [notes, setNotes] = useState('');
@@ -42,28 +54,124 @@ export default function MeetingDetailModal({
   const [newActionItem, setNewActionItem] = useState('');
   const [copied, setCopied] = useState(false);
   const [copiedTranscript, setCopiedTranscript] = useState(false);
+  const [copiedSummary, setCopiedSummary] = useState(false);
   const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
-  const [isProcessingAI, setIsProcessingAI] = useState(false);
+
+  // Live AI & Bot states
+  const [currentMeeting, setCurrentMeeting] = useState(meeting);
+  const [aiStatus, setAiStatus] = useState('pending');
+  const [aiSummary, setAiSummary] = useState('');
+  const [aiTranscript, setAiTranscript] = useState('');
+  const [aiDecisions, setAiDecisions] = useState([]);
+  const [aiCommitments, setAiCommitments] = useState([]);
+  const [aiError, setAiError] = useState(null);
+  const [aiProcessedAt, setAiProcessedAt] = useState(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isStartingBot, setIsStartingBot] = useState(false);
   const [isEndingMeeting, setIsEndingMeeting] = useState(false);
+  const [isRetryingAI, setIsRetryingAI] = useState(false);
+  const [botActionError, setBotActionError] = useState(null);
 
+  const pollTimerRef = useRef(null);
+
+  // Synchronize base meeting props when modal opens or meeting changes
   useEffect(() => {
     if (meeting) {
-      setNotes(meeting.notes || '');
+      setCurrentMeeting(meeting);
+      setNotes(meeting.notes || meeting.transcript || '');
       setKeyDecisions(meeting.keyDecisions || []);
       setActionItems(meeting.actionItems || []);
+      setAiStatus(meeting.ai_status || 'pending');
+      setAiSummary(meeting.summary || '');
+      setAiTranscript(meeting.transcript || '');
+      setAiError(meeting.ai_error || null);
+      setAiProcessedAt(meeting.ai_processed_at || null);
       setNewDecision('');
       setNewActionItem('');
       setHasUnsavedNotes(false);
-      // If completed, default to notes tab if notes or decisions exist
-      if (meeting.status === 'completed' && (meeting.notes || meeting.keyDecisions?.length > 0)) {
-        setActiveTab('notes');
+      setBotActionError(null);
+
+      // Default to AI tab if completed summary exists, otherwise overview
+      if (meeting.summary || meeting.ai_status === 'completed') {
+        setActiveTab('ai');
       } else {
         setActiveTab('overview');
       }
     }
   }, [meeting, isOpen]);
 
+  // Fetch full details, decisions, and commitments for existing meetings
+  const fetchLatestMeetingDetails = useCallback(async (meetingId, isEvent = false) => {
+    if (!meetingId || isEvent) return;
+    try {
+      setIsLoadingDetails(true);
+      const [mRes, dRes, cRes] = await Promise.all([
+        getMeeting(meetingId).catch(() => null),
+        getDecisions({ meeting_id: meetingId }).catch(() => []),
+        getCommitments({ meeting_id: meetingId }).catch(() => []),
+      ]);
+
+      if (mRes) {
+        setCurrentMeeting((prev) => ({
+          ...prev,
+          ...mRes,
+          meetingLink: mRes.meet_link || prev.meetingLink,
+          rawStatus: mRes.status,
+        }));
+        setAiStatus(mRes.ai_status || 'pending');
+        setAiSummary(mRes.summary || '');
+        setAiTranscript(mRes.transcript || '');
+        setAiError(mRes.ai_error || null);
+        setAiProcessedAt(mRes.ai_processed_at || null);
+        if (mRes.transcript && !notes) {
+          setNotes(mRes.transcript);
+        }
+        if (onRefreshMeeting) {
+          onRefreshMeeting(mRes);
+        }
+      }
+
+      if (Array.isArray(dRes)) {
+        setAiDecisions(dRes);
+      }
+      if (Array.isArray(cRes)) {
+        setAiCommitments(cRes);
+      }
+    } catch (err) {
+      console.warn('Could not load fresh meeting details:', err);
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  }, [notes, onRefreshMeeting]);
+
+  // Initial fetch on open for non-event meetings
+  useEffect(() => {
+    if (isOpen && meeting && meeting.id && !meeting.isEvent) {
+      fetchLatestMeetingDetails(meeting.id, false);
+    }
+  }, [isOpen, meeting, fetchLatestMeetingDetails]);
+
+  // Auto-polling for processing completion: refresh without requiring manual page reload
+  useEffect(() => {
+    if (!isOpen || !currentMeeting?.id || currentMeeting.isEvent) {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      return;
+    }
+
+    if (aiStatus === 'processing' || currentMeeting.rawStatus === 'bot_active') {
+      pollTimerRef.current = setInterval(() => {
+        fetchLatestMeetingDetails(currentMeeting.id, false);
+      }, 3000);
+    } else {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    }
+
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, [isOpen, aiStatus, currentMeeting?.rawStatus, currentMeeting?.id, currentMeeting?.isEvent, fetchLatestMeetingDetails]);
+
+  // Escape key handler
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
@@ -74,15 +182,25 @@ export default function MeetingDetailModal({
 
   if (!isOpen || !meeting) return null;
 
-  const isToday = meeting.status === 'today';
-  const isUpcoming = meeting.status === 'upcoming' || isToday;
-  const isCompleted = meeting.status === 'completed';
+  const mData = currentMeeting || meeting;
+  const isPast = mData.isPast || mData.status === 'completed' || mData.rawStatus === 'ended';
+  const isCompleted = isPast;
+  const isBotActive = mData.rawStatus === 'bot_active';
+  const hasConferenceLink = Boolean(mData.meetingLink && mData.meetingLink.startsWith('http'));
 
   const handleCopyLink = () => {
-    if (meeting.meetingLink) {
-      navigator.clipboard?.writeText(meeting.meetingLink);
+    if (mData.meetingLink) {
+      navigator.clipboard?.writeText(mData.meetingLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCopySummary = () => {
+    if (aiSummary) {
+      navigator.clipboard?.writeText(aiSummary);
+      setCopiedSummary(true);
+      setTimeout(() => setCopiedSummary(false), 2000);
     }
   };
 
@@ -92,11 +210,13 @@ export default function MeetingDetailModal({
   };
 
   const handleSaveNotes = () => {
-    onSaveMeetingNotes(meeting.id, {
-      notes,
-      keyDecisions,
-      actionItems,
-    });
+    if (onSaveMeetingNotes) {
+      onSaveMeetingNotes(mData.id, {
+        notes,
+        keyDecisions,
+        actionItems,
+      });
+    }
     setHasUnsavedNotes(false);
   };
 
@@ -106,21 +226,25 @@ export default function MeetingDetailModal({
     const updated = [...keyDecisions, newDecision.trim()];
     setKeyDecisions(updated);
     setNewDecision('');
-    onSaveMeetingNotes(meeting.id, {
-      notes,
-      keyDecisions: updated,
-      actionItems,
-    });
+    if (onSaveMeetingNotes) {
+      onSaveMeetingNotes(mData.id, {
+        notes,
+        keyDecisions: updated,
+        actionItems,
+      });
+    }
   };
 
   const handleDeleteDecision = (idx) => {
     const updated = keyDecisions.filter((_, i) => i !== idx);
     setKeyDecisions(updated);
-    onSaveMeetingNotes(meeting.id, {
-      notes,
-      keyDecisions: updated,
-      actionItems,
-    });
+    if (onSaveMeetingNotes) {
+      onSaveMeetingNotes(mData.id, {
+        notes,
+        keyDecisions: updated,
+        actionItems,
+      });
+    }
   };
 
   const handleAddActionItem = (e) => {
@@ -129,11 +253,13 @@ export default function MeetingDetailModal({
     const updated = [...actionItems, { text: newActionItem.trim(), done: false }];
     setActionItems(updated);
     setNewActionItem('');
-    onSaveMeetingNotes(meeting.id, {
-      notes,
-      keyDecisions,
-      actionItems: updated,
-    });
+    if (onSaveMeetingNotes) {
+      onSaveMeetingNotes(mData.id, {
+        notes,
+        keyDecisions,
+        actionItems: updated,
+      });
+    }
   };
 
   const handleToggleActionItem = (idx) => {
@@ -141,21 +267,90 @@ export default function MeetingDetailModal({
       i === idx ? { ...item, done: !item.done } : item
     );
     setActionItems(updated);
-    onSaveMeetingNotes(meeting.id, {
-      notes,
-      keyDecisions,
-      actionItems: updated,
-    });
+    if (onSaveMeetingNotes) {
+      onSaveMeetingNotes(mData.id, {
+        notes,
+        keyDecisions,
+        actionItems: updated,
+      });
+    }
   };
 
   const handleDeleteActionItem = (idx) => {
     const updated = actionItems.filter((_, i) => i !== idx);
     setActionItems(updated);
-    onSaveMeetingNotes(meeting.id, {
-      notes,
-      keyDecisions,
-      actionItems: updated,
-    });
+    if (onSaveMeetingNotes) {
+      onSaveMeetingNotes(mData.id, {
+        notes,
+        keyDecisions,
+        actionItems: updated,
+      });
+    }
+  };
+
+  // Launch AI Bot action
+  const handleLaunchBotClick = async () => {
+    if (isStartingBot) return;
+    setIsStartingBot(true);
+    setBotActionError(null);
+    try {
+      if (onStartBot) {
+        await onStartBot(mData);
+      } else {
+        const isEvent = Boolean(mData.isEvent);
+        if (isEvent) {
+          await launchBotForEvent(mData.id);
+        } else {
+          await joinMeeting(mData.id, mData.meetingLink);
+        }
+      }
+      setCurrentMeeting((prev) => ({ ...prev, rawStatus: 'bot_active' }));
+      // Fetch fresh status
+      if (!mData.isEvent) {
+        await fetchLatestMeetingDetails(mData.id, false);
+      }
+    } catch (err) {
+      const msg = err?.message || 'Failed to start AI meeting bot.';
+      setBotActionError(msg);
+    } finally {
+      setIsStartingBot(false);
+    }
+  };
+
+  // End & process action
+  const handleEndMeetingClick = async () => {
+    if (isEndingMeeting) return;
+    setIsEndingMeeting(true);
+    setBotActionError(null);
+    try {
+      if (onEndMeeting) {
+        await onEndMeeting(mData);
+      }
+      setCurrentMeeting((prev) => ({ ...prev, rawStatus: 'ended' }));
+      if (!mData.isEvent) {
+        await fetchLatestMeetingDetails(mData.id, false);
+      }
+    } catch (err) {
+      const msg = err?.message || 'Failed to end meeting session.';
+      setBotActionError(msg);
+    } finally {
+      setIsEndingMeeting(false);
+    }
+  };
+
+  // Optional manual retry if processing failed
+  const handleRetryProcessing = async () => {
+    if (isRetryingAI || mData.isEvent) return;
+    setIsRetryingAI(true);
+    setBotActionError(null);
+    try {
+      await processMeetingAI(mData.id);
+      await fetchLatestMeetingDetails(mData.id, false);
+    } catch (err) {
+      setBotActionError(`Reprocessing error: ${err.message || 'Pipeline failed'}`);
+    } finally {
+      setIsRetryingAI(false);
+    }
   };
 
   return (
@@ -165,39 +360,60 @@ export default function MeetingDetailModal({
         <div className="modal-header">
           <div className="modal-title-group">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-              <span className="meeting-type-badge">{meeting.meetingType}</span>
+              <span className="meeting-type-badge">{mData.meetingType || 'Meeting'}</span>
               <span className="meeting-project-badge">
                 <Folder size={12} style={{ color: 'var(--text-subtle)' }} />
-                <span>{meeting.clientProject || 'General'}</span>
+                <span>{mData.clientProject || 'General'}</span>
               </span>
-              {meeting.needsFollowUp && (
+
+              {/* Bot Capture Status Pill */}
+              {isBotActive ? (
+                <span className="status-pill" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981', fontWeight: 600 }}>
+                  ● Bot Active Recording
+                </span>
+              ) : mData.rawStatus === 'failed' ? (
+                <span className="status-pill" style={{ backgroundColor: '#fee2e2', color: '#b91c1c' }}>
+                  Bot Failed
+                </span>
+              ) : mData.rawStatus === 'ended' ? (
+                <span className="status-pill status-completed">
+                  Bot Ended
+                </span>
+              ) : null}
+
+              {/* AI Processing Status Pill */}
+              {aiStatus === 'processing' ? (
+                <span className="status-pill" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', border: '1px solid #3b82f6', fontWeight: 600 }}>
+                  ● AI: Processing...
+                </span>
+              ) : aiStatus === 'completed' ? (
+                <span className="status-pill status-completed">
+                  AI: Completed
+                </span>
+              ) : aiStatus === 'failed' ? (
+                <span className="status-pill" style={{ backgroundColor: '#fee2e2', color: '#b91c1c' }}>
+                  AI: Failed
+                </span>
+              ) : (
+                <span className="status-pill status-pending">
+                  AI: Pending
+                </span>
+              )}
+
+              {mData.needsFollowUp && (
                 <span className="meeting-followup-badge">
                   <AlertTriangle size={11} />
                   <span>Needs Follow-up</span>
                 </span>
               )}
-              {isCompleted && (
-                <span className="status-pill status-completed">Completed</span>
-              )}
-              {meeting.rawStatus === 'bot_active' ? (
-                <span className="status-pill" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981', fontWeight: 600 }}>
-                  ● Bot Active Recording
-                </span>
-              ) : meeting.rawStatus === 'failed' ? (
-                <span className="status-pill" style={{ backgroundColor: '#fee2e2', color: '#b91c1c' }}>
-                  Bot Failed
-                </span>
-              ) : meeting.rawStatus === 'ended' ? (
-                <span className="status-pill status-completed">
-                  Bot Ended
-                </span>
-              ) : null}
             </div>
-            <h3 className="modal-title">{meeting.title}</h3>
+
+            <h3 className="modal-title">{mData.title}</h3>
             <p className="modal-subtitle">
-              {meeting.timeLabel || `${meeting.date} · ${meeting.time}`} • {meeting.location || 'Online'}
+              {mData.timeLabel || `${mData.date} · ${mData.time}`} • {mData.location || 'Online'}
             </p>
           </div>
+
           <button 
             type="button" 
             className="modal-close-btn" 
@@ -218,6 +434,7 @@ export default function MeetingDetailModal({
             <Calendar size={14} />
             <span>Context & Prep</span>
           </button>
+
           <button
             type="button"
             className={`meeting-detail-tab-btn ${activeTab === 'ai' ? 'active' : ''}`}
@@ -225,12 +442,13 @@ export default function MeetingDetailModal({
           >
             <Sparkles size={14} />
             <span>AI Intelligence & Summary</span>
-            {meeting.summary && (
+            {aiSummary && (
               <span className="filter-count-badge" style={{ marginLeft: 4, backgroundColor: 'var(--accent-primary)', color: '#fff' }}>
                 Ready
               </span>
             )}
           </button>
+
           <button
             type="button"
             className={`meeting-detail-tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
@@ -248,26 +466,99 @@ export default function MeetingDetailModal({
 
         {/* Modal Body */}
         <div className="modal-body" style={{ padding: '20px 22px' }}>
+          {/* Action error banner */}
+          {botActionError && (
+            <div className="postpone-notice-box" style={{ backgroundColor: 'var(--badge-rose-bg)', borderColor: 'var(--badge-rose-border)', color: 'var(--badge-rose-text)', marginBottom: 14 }}>
+              <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 12.5 }}>{botActionError}</div>
+            </div>
+          )}
+
           {/* Tab 1: Overview & Context */}
           {activeTab === 'overview' && (
             <div className="meeting-detail-content">
               {/* Meeting Follow-up Banner if needed */}
-              {meeting.needsFollowUp && (
+              {mData.needsFollowUp && (
                 <div className="followup-action-banner">
                   <div className="followup-text-group">
                     <AlertTriangle size={16} />
                     <span>This meeting was flagged for manager follow-up.</span>
                   </div>
-                  <button
-                    type="button"
-                    className="btn-create-followup-task"
-                    onClick={() => onCreateFollowUpTask(meeting)}
-                  >
-                    <Plus size={13} />
-                    <span>Create Follow-up Task</span>
-                  </button>
+                  {onCreateFollowUpTask && (
+                    <button
+                      type="button"
+                      className="btn-create-followup-task"
+                      onClick={() => onCreateFollowUpTask(mData)}
+                    >
+                      <Plus size={13} />
+                      <span>Create Follow-up Task</span>
+                    </button>
+                  )}
                 </div>
               )}
+
+              {/* Bot Control Card in Overview */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16, alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Bot size={16} style={{ color: isBotActive ? '#10b981' : 'var(--accent-primary)' }} />
+                  <div>
+                    <span style={{ fontSize: '13px', fontWeight: 600, display: 'block' }}>
+                      {isBotActive ? 'AI Bot Recording Active' : 'AI Meeting Bot Scraper'}
+                    </span>
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-subtle)' }}>
+                      {isBotActive
+                        ? 'Selenium worker is listening to captions and storing the transcript.'
+                        : 'Automatically joins the Google Meet room, turns on captions, and saves transcripts.'}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {!isBotActive && !isCompleted && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={isStartingBot}
+                      onClick={handleLaunchBotClick}
+                      style={{ fontSize: '12.5px', padding: '6px 14px' }}
+                    >
+                      {isStartingBot ? (
+                        <>
+                          <Loader2 size={13} className="spin-icon" style={{ marginRight: 5 }} />
+                          <span>Joining Bot...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bot size={13} style={{ marginRight: 5 }} />
+                          <span>Join Bot</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {isBotActive && (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={isEndingMeeting}
+                      onClick={handleEndMeetingClick}
+                      style={{ fontSize: '12.5px', padding: '6px 12px', color: '#ef4444', borderColor: '#fca5a5' }}
+                    >
+                      {isEndingMeeting ? (
+                        <>
+                          <Loader2 size={13} className="spin-icon" style={{ marginRight: 5 }} />
+                          <span>Ending...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Square size={13} style={{ marginRight: 5 }} />
+                          <span>End & Process</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {/* Agenda Section */}
               <div className="detail-section-block">
@@ -276,22 +567,9 @@ export default function MeetingDetailModal({
                   Meeting Agenda & Scope
                 </span>
                 <div className="detail-card-box" style={{ whiteSpace: 'pre-line' }}>
-                  {meeting.agenda || 'No agenda items added.'}
+                  {mData.agenda || 'No agenda items added.'}
                 </div>
               </div>
-
-              {/* Previous Context Section */}
-              {meeting.previousContext && (
-                <div className="detail-section-block">
-                  <span className="detail-block-title">
-                    <FileText size={13} />
-                    Previous Context & Memory
-                  </span>
-                  <div className="detail-card-box" style={{ backgroundColor: 'var(--accent-primary-light)', borderColor: 'var(--accent-primary-border)', color: 'var(--text-main)' }}>
-                    {meeting.previousContext}
-                  </div>
-                </div>
-              )}
 
               {/* Attendees & Link */}
               <div className="form-row-2">
@@ -301,9 +579,9 @@ export default function MeetingDetailModal({
                     Participants
                   </span>
                   <div className="detail-card-box">
-                    {meeting.participants && meeting.participants.length > 0 ? (
+                    {mData.participants && mData.participants.length > 0 ? (
                       <ul style={{ listStyle: 'disc', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        {meeting.participants.map((p, idx) => (
+                        {mData.participants.map((p, idx) => (
                           <li key={idx} style={{ fontSize: 12.5 }}>{p}</li>
                         ))}
                       </ul>
@@ -320,8 +598,8 @@ export default function MeetingDetailModal({
                   </span>
                   <div className="detail-card-box">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600 }}>{meeting.location || 'Google Meet'}</span>
-                      {meeting.meetingLink && (
+                      <span style={{ fontSize: 12.5, fontWeight: 600 }}>{mData.location || 'Google Meet'}</span>
+                      {hasConferenceLink && (
                         <button
                           type="button"
                           className="meeting-copy-btn"
@@ -342,59 +620,19 @@ export default function MeetingDetailModal({
                         </button>
                       )}
                     </div>
-                    {meeting.meetingLink && (
+                    {hasConferenceLink && (
                       <a
-                        href={meeting.meetingLink}
+                        href={mData.meetingLink}
                         target="_blank"
                         rel="noreferrer"
                         style={{ fontSize: 11.5, color: 'var(--accent-primary)', wordBreak: 'break-all', marginTop: 4, display: 'block' }}
                       >
-                        {meeting.meetingLink}
+                        {mData.meetingLink}
                       </a>
                     )}
                   </div>
                 </div>
               </div>
-
-              {/* Related Memories */}
-              {meeting.relatedMemories && meeting.relatedMemories.length > 0 && (
-                <div className="detail-section-block">
-                  <span className="detail-block-title">
-                    <BookmarkCheck size={13} />
-                    Ingested Memories ({meeting.relatedMemories.length})
-                  </span>
-                  <div className="detail-memories-grid">
-                    {meeting.relatedMemories.map((mem, idx) => (
-                      <div key={idx} className="detail-memory-card">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <h5 className="detail-memory-title">{mem.title}</h5>
-                          <span style={{ fontSize: 11, color: 'var(--text-subtle)' }}>{mem.dateSource}</span>
-                        </div>
-                        <p className="detail-memory-summary">{mem.summary}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Related Tasks */}
-              {meeting.relatedTasks && meeting.relatedTasks.length > 0 && (
-                <div className="detail-section-block">
-                  <span className="detail-block-title">
-                    <ListTodo size={13} />
-                    Related Tasks & Commitments ({meeting.relatedTasks.length})
-                  </span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {meeting.relatedTasks.map((t, idx) => (
-                      <div key={idx} className="action-item-row">
-                        <CheckSquare size={14} style={{ color: t.status === 'completed' ? '#10b981' : 'var(--text-subtle)' }} />
-                        <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>{t.title}</span>
-                        <span className={`status-pill status-${t.status}`}>{t.status}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -404,109 +642,250 @@ export default function MeetingDetailModal({
               {/* Bot & Pipeline Actions Bar */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16, alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Bot size={16} style={{ color: 'var(--accent-primary)' }} />
-                  <span style={{ fontSize: '13px', fontWeight: 600 }}>
-                    AI Pipeline & Bot Controller
-                  </span>
+                  <Bot size={16} style={{ color: isBotActive ? '#10b981' : 'var(--accent-primary)' }} />
+                  <div>
+                    <span style={{ fontSize: '13px', fontWeight: 600, display: 'block' }}>
+                      AI Intelligence Lifecycle Controller
+                    </span>
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-subtle)' }}>
+                      Status: <strong>{aiStatus.toUpperCase()}</strong>
+                      {aiProcessedAt && ` • Processed at ${new Date(aiProcessedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+                    </span>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {/* Bot Launch / Stop Buttons */}
-                  {onStartBot && meeting.rawStatus !== 'bot_active' && !isCompleted && (
+                  {/* Join Bot */}
+                  {!isBotActive && !isCompleted && (
                     <button
                       type="button"
-                      className="btn-secondary"
+                      className="btn-primary"
                       disabled={isStartingBot}
-                      onClick={async () => {
-                        setIsStartingBot(true);
-                        try {
-                          await onStartBot(meeting);
-                        } finally {
-                          setIsStartingBot(false);
-                        }
-                      }}
-                      style={{ fontSize: '12.5px', padding: '6px 12px' }}
+                      onClick={handleLaunchBotClick}
+                      style={{ fontSize: '12.5px', padding: '6px 14px' }}
                     >
-                      <Bot size={13} className={isStartingBot ? 'spin-icon' : ''} style={{ marginRight: 5 }} />
-                      <span>{isStartingBot ? 'Launching Bot...' : 'Launch AI Bot'}</span>
+                      {isStartingBot ? (
+                        <>
+                          <Loader2 size={13} className="spin-icon" style={{ marginRight: 5 }} />
+                          <span>Joining Bot...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bot size={13} style={{ marginRight: 5 }} />
+                          <span>Join Bot</span>
+                        </>
+                      )}
                     </button>
                   )}
 
-                  {onEndMeeting && meeting.rawStatus === 'bot_active' && (
+                  {/* End & Process */}
+                  {isBotActive && (
                     <button
                       type="button"
                       className="btn-secondary"
                       disabled={isEndingMeeting}
-                      onClick={async () => {
-                        setIsEndingMeeting(true);
-                        try {
-                          await onEndMeeting(meeting);
-                        } finally {
-                          setIsEndingMeeting(false);
-                        }
-                      }}
+                      onClick={handleEndMeetingClick}
                       style={{ fontSize: '12.5px', padding: '6px 12px', color: '#ef4444', borderColor: '#fca5a5' }}
                     >
-                      <Square size={13} className={isEndingMeeting ? 'spin-icon' : ''} style={{ marginRight: 5 }} />
-                      <span>{isEndingMeeting ? 'Stopping Bot...' : 'End & Process'}</span>
+                      {isEndingMeeting ? (
+                        <>
+                          <Loader2 size={13} className="spin-icon" style={{ marginRight: 5 }} />
+                          <span>Ending...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Square size={13} style={{ marginRight: 5 }} />
+                          <span>End & Process</span>
+                        </>
+                      )}
                     </button>
                   )}
 
-                  {/* Run AI Processing */}
-                  {onProcessAI && (
+                  {/* Retry AI (only visible if processing failed or needs manual trigger) */}
+                  {aiStatus === 'failed' && (
                     <button
                       type="button"
-                      className="btn-primary"
-                      disabled={isProcessingAI}
-                      onClick={async () => {
-                        setIsProcessingAI(true);
-                        try {
-                          await onProcessAI(meeting.id);
-                        } finally {
-                          setIsProcessingAI(false);
-                        }
-                      }}
-                      style={{ fontSize: '12.5px', padding: '6px 14px' }}
+                      className="btn-secondary"
+                      disabled={isRetryingAI}
+                      onClick={handleRetryProcessing}
+                      style={{ fontSize: '12.5px', padding: '6px 12px' }}
                     >
-                      <Sparkles size={13} className={isProcessingAI ? 'spin-icon' : ''} style={{ marginRight: 5 }} />
-                      <span>{isProcessingAI ? 'Analyzing...' : 'Run AI Analysis'}</span>
+                      {isRetryingAI ? (
+                        <>
+                          <Loader2 size={13} className="spin-icon" style={{ marginRight: 5 }} />
+                          <span>Retrying...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw size={13} style={{ marginRight: 5 }} />
+                          <span>Retry AI Processing</span>
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* AI Executive Summary */}
+              {/* Status Banner */}
+              {aiStatus === 'processing' && (
+                <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, color: '#1d4ed8' }}>
+                  <Loader2 size={18} className="spin-icon" style={{ flexShrink: 0 }} />
+                  <div style={{ fontSize: 13 }}>
+                    <strong>AI Analysis in Progress:</strong> The backend is analyzing the transcript, generating the summary, and extracting key decisions and action items. This view will update automatically.
+                  </div>
+                </div>
+              )}
+
+              {aiStatus === 'failed' && (
+                <div style={{ backgroundColor: 'var(--badge-rose-bg)', border: '1px solid var(--badge-rose-border)', borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10, color: 'var(--badge-rose-text)' }}>
+                  <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                  <div style={{ fontSize: 13 }}>
+                    <strong>AI Processing Failed:</strong> {aiError || 'Intelligence extraction encountered an error.'} You can click "Retry AI Processing" above.
+                  </div>
+                </div>
+              )}
+
+              {/* AI Executive Summary Block */}
               <div className="detail-section-block">
-                <span className="detail-block-title">
-                  <Sparkles size={13} style={{ color: 'var(--accent-primary)' }} />
-                  AI Executive Summary
-                </span>
-                {meeting.summary ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span className="detail-block-title">
+                    <Sparkles size={13} style={{ color: 'var(--accent-primary)' }} />
+                    AI Executive Summary
+                  </span>
+                  {aiSummary && (
+                    <button
+                      type="button"
+                      className="btn-inline-add"
+                      onClick={handleCopySummary}
+                    >
+                      {copiedSummary ? <Check size={11} style={{ marginRight: 3, color: '#10b981' }} /> : <Copy size={11} style={{ marginRight: 3 }} />}
+                      <span>{copiedSummary ? 'Copied' : 'Copy Summary'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {aiSummary ? (
                   <div className="detail-card-box" style={{ whiteSpace: 'pre-line', lineHeight: 1.6, backgroundColor: 'var(--accent-primary-light)', borderColor: 'var(--accent-primary-border)', color: 'var(--text-main)', fontSize: '13px' }}>
-                    {meeting.summary}
+                    {aiSummary}
                   </div>
                 ) : (
                   <div className="detail-card-box" style={{ textAlign: 'center', padding: '24px 16px', color: 'var(--text-muted)' }}>
                     <Sparkles size={22} style={{ margin: '0 auto 8px', color: 'var(--accent-primary)', opacity: 0.8 }} />
-                    <p style={{ fontWeight: 500, color: 'var(--text-main)', marginBottom: 4, fontSize: '13px' }}>No AI Summary Available Yet</p>
-                    <p style={{ fontSize: '12px' }}>Click "Run AI Analysis" to summarize the transcript and automatically extract commitments and key decisions.</p>
+                    {aiStatus === 'completed' ? (
+                      <>
+                        <p style={{ fontWeight: 500, color: 'var(--text-main)', marginBottom: 4, fontSize: '13px' }}>
+                          No Speech or Captions Detected
+                        </p>
+                        <p style={{ fontSize: '12px' }}>
+                          The bot recorded the call, but no spoken captions were detected. The transcript is empty.
+                        </p>
+                      </>
+                    ) : aiStatus === 'pending' ? (
+                      <>
+                        <p style={{ fontWeight: 500, color: 'var(--text-main)', marginBottom: 4, fontSize: '13px' }}>
+                          AI Summary Scheduled
+                        </p>
+                        <p style={{ fontSize: '12px' }}>
+                          {aiTranscript 
+                            ? 'Transcript has been captured. AI intelligence processing will run automatically when the scheduled meeting end time arrives.'
+                            : 'Launch the AI Meeting Bot during your call. When the meeting concludes, your executive summary and action items will appear here automatically.'}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p style={{ fontWeight: 500, color: 'var(--text-main)', marginBottom: 4, fontSize: '13px' }}>
+                          Summary Unavailable
+                        </p>
+                        <p style={{ fontSize: '12px' }}>
+                          AI intelligence extraction has not completed yet.
+                        </p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Ingested Transcript Viewer */}
+              {/* Extracted Key Decisions */}
               <div className="detail-section-block">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className="detail-block-title">
+                  <CheckCircle2 size={13} style={{ color: 'var(--accent-primary)' }} />
+                  Extracted Key Decisions ({aiDecisions.length})
+                </span>
+                {aiDecisions.length > 0 ? (
+                  <div className="item-list-container">
+                    {aiDecisions.map((dec, idx) => (
+                      <div key={dec.id || idx} className="decision-item-row" style={{ padding: '8px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--accent-primary)', flexShrink: 0 }} />
+                          <span style={{ fontSize: '12.5px', color: 'var(--text-main)' }}>{dec.decision}</span>
+                        </div>
+                        {dec.created_at && (
+                          <span style={{ fontSize: '11px', color: 'var(--text-subtle)' }}>
+                            {new Date(dec.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="detail-card-box" style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                    {aiStatus === 'completed'
+                      ? 'No formal decisions were extracted from this meeting transcript.'
+                      : 'Key decisions agreed upon during the sync will be extracted automatically.'}
+                  </div>
+                )}
+              </div>
+
+              {/* Extracted Commitments & Action Items */}
+              <div className="detail-section-block">
+                <span className="detail-block-title">
+                  <ListTodo size={13} style={{ color: 'var(--accent-primary)' }} />
+                  Extracted Commitments & Tasks ({aiCommitments.length})
+                </span>
+                {aiCommitments.length > 0 ? (
+                  <div className="item-list-container">
+                    {aiCommitments.map((com, idx) => (
+                      <div key={com.id || idx} className="action-item-row" style={{ padding: '8px 12px', alignItems: 'center' }}>
+                        <CheckSquare size={14} style={{ color: com.status === 'completed' ? '#10b981' : 'var(--text-subtle)', flexShrink: 0 }} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span style={{ fontSize: '12.5px', fontWeight: 500, color: 'var(--text-main)' }}>
+                            {com.task}
+                          </span>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '11px', color: 'var(--text-subtle)' }}>
+                            <span><strong>Assignee:</strong> {com.person || 'Unassigned'}</span>
+                            {com.deadline && (
+                              <span><strong>Deadline:</strong> {new Date(com.deadline).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`status-pill status-${com.status || 'pending'}`}>
+                          {com.status || 'pending'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="detail-card-box" style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                    {aiStatus === 'completed'
+                      ? 'No action items or individual commitments were detected in this transcript.'
+                      : 'Action items assigned to team members will be extracted automatically.'}
+                  </div>
+                )}
+              </div>
+
+              {/* Meeting Transcript Viewer */}
+              <div className="detail-section-block">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <span className="detail-block-title">
                     <FileText size={13} />
                     Meeting Transcript
                   </span>
-                  {meeting.transcript && (
+                  {aiTranscript && (
                     <button
                       type="button"
                       className="btn-inline-add"
                       onClick={() => {
-                        navigator.clipboard?.writeText(meeting.transcript);
+                        navigator.clipboard?.writeText(aiTranscript);
                         setCopiedTranscript(true);
                         setTimeout(() => setCopiedTranscript(false), 2000);
                       }}
@@ -516,20 +895,20 @@ export default function MeetingDetailModal({
                     </button>
                   )}
                 </div>
-                {meeting.transcript ? (
+                {aiTranscript ? (
                   <div className="detail-card-box" style={{ maxHeight: '220px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '11.5px', lineHeight: 1.5, backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-light)' }}>
-                    {meeting.transcript}
+                    {aiTranscript}
                   </div>
                 ) : (
                   <div className="detail-card-box" style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                    No transcript recorded. You can add one in the "Meeting Notes & Decisions" tab or launch the AI Meeting Bot during live calls.
+                    No transcript recorded yet. Launch the AI Meeting Bot during live calls to capture captions automatically.
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* Tab 3: Notes & Decisions (for manual note-taking) */}
+          {/* Tab 3: Notes & Decisions (for manual manager notes) */}
           {activeTab === 'notes' && (
             <div className="meeting-detail-content">
               {/* Meeting Notes */}
@@ -644,33 +1023,85 @@ export default function MeetingDetailModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+        <div className="modal-footer" style={{ justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
           <div>
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => onToggleFollowUp(meeting)}
-              style={meeting.needsFollowUp ? { color: 'var(--badge-amber-text)', borderColor: 'var(--badge-amber-border)' } : {}}
-            >
-              <AlertTriangle size={13} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-              {meeting.needsFollowUp ? 'Remove Follow-up' : 'Mark as Follow-up'}
-            </button>
+            {onToggleFollowUp && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => onToggleFollowUp(mData)}
+                style={mData.needsFollowUp ? { color: 'var(--badge-amber-text)', borderColor: 'var(--badge-amber-border)' } : {}}
+              >
+                <AlertTriangle size={13} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                {mData.needsFollowUp ? 'Remove Follow-up' : 'Mark as Follow-up'}
+              </button>
+            )}
           </div>
 
-          <div style={{ display: 'flex', gap: 10 }}>
-            {isUpcoming && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {/* Join Bot in Footer */}
+            {!isBotActive && !isCompleted && (
               <button
                 type="button"
                 className="btn-primary"
+                disabled={isStartingBot}
+                onClick={handleLaunchBotClick}
+              >
+                {isStartingBot ? (
+                  <>
+                    <Loader2 size={13} className="spin-icon" style={{ marginRight: 5 }} />
+                    <span>Joining Bot...</span>
+                  </>
+                ) : (
+                  <>
+                    <Bot size={13} style={{ marginRight: 5 }} />
+                    <span>Join Bot</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* End & Process in Footer if bot is running */}
+            {isBotActive && (
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={isEndingMeeting}
+                onClick={handleEndMeetingClick}
+                style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+              >
+                {isEndingMeeting ? (
+                  <>
+                    <Loader2 size={13} className="spin-icon" style={{ marginRight: 5 }} />
+                    <span>Ending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Square size={13} style={{ marginRight: 5 }} />
+                    <span>End & Process</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Manual Join Meeting button */}
+            {hasConferenceLink && (
+              <button
+                type="button"
+                className="btn-secondary"
                 onClick={() => {
-                  onClose();
-                  onJoinMeeting(meeting);
+                  if (onJoinMeeting) {
+                    onJoinMeeting(mData);
+                  } else {
+                    window.open(mData.meetingLink, '_blank', 'noopener,noreferrer');
+                  }
                 }}
               >
                 <Video size={13} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Join Meeting
+                Join Call
               </button>
             )}
+
             <button type="button" className="btn-secondary" onClick={onClose}>
               Close
             </button>

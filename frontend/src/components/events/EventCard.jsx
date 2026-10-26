@@ -7,13 +7,15 @@ import {
   Pencil, 
   Trash2, 
   Globe, 
-  FileText 
+  FileText,
+  Bot
 } from 'lucide-react';
 
 export default function EventCard({
   event,
   onEdit,
-  onDelete
+  onDelete,
+  onJoinBot
 }) {
   const isGoogle = event.source === 'google_calendar' || Boolean(event.google_event_id);
   const isPast = event.isPast;
@@ -88,6 +90,19 @@ export default function EventCard({
         </div>
 
         <div className="event-actions-group">
+          {event.location && event.location.startsWith('http') && onJoinBot && (
+            <button
+              type="button"
+              className="btn-event-action"
+              onClick={() => onJoinBot(event)}
+              title="Launch AI Meeting Bot for this conference"
+              style={{ color: 'var(--accent-primary)', borderColor: 'var(--accent-primary-border)', fontWeight: 600 }}
+            >
+              <Bot size={12} />
+              <span>Join Bot</span>
+            </button>
+          )}
+
           {!isGoogle && onEdit && (
             <button
               type="button"
