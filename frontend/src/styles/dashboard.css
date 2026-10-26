@@ -267,111 +267,48 @@ body {
   line-height: 1.35;
 }
 
-.sidebar-profile {
-  padding: 16px 18px;
-  border-top: 1px solid var(--border-light);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background-color: var(--bg-sidebar);
-}
-
-.profile-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-full);
-  background-color: #e2e8f0;
-  color: #334155;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
-  border: 1px solid var(--border-subtle);
-}
-
-.profile-info {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-
-.sidebar-profile {
+/* ==========================================================================
+   Sidebar Footer & User Profile
+   ========================================================================== */
+.sidebar-footer {
   flex-shrink: 0;
   margin-top: auto;
   padding: 14px 16px;
-  border-top: 1px solid var(--border-light);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
+  border-top: 1px solid var(--border-subtle);
   background-color: var(--bg-sidebar);
   box-sizing: border-box;
 }
 
-.profile-avatar {
+.user-profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  transition: background-color 0.15s ease;
+}
+
+.user-profile-summary:hover {
+  background-color: var(--bg-hover);
+}
+
+.user-avatar-initials {
   width: 36px;
   height: 36px;
   flex-shrink: 0;
   border-radius: var(--radius-full);
-  background-color: #ede9fe;
-  color: #6d28d9;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
   font-weight: 700;
-  border: 1px solid var(--border-subtle);
-}
-
-.profile-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  overflow: hidden;
-}
-
-.profile-name,
-.profile-role {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.4;
-}
-
-.profile-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-
-.profile-role {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-
-.sidebar-backdrop {
-  display: none;
-}
-
-
-.user-profile-summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-width: 0;
-}
-
-.user-avatar-initials {
-  flex-shrink: 0;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .user-meta-group {
@@ -379,20 +316,59 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   overflow: hidden;
 }
 
-.user-full-name,
-.user-designation {
+.user-full-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-main);
   display: block;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.user-designation {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 .sidebar-logout-btn {
   flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.sidebar-logout-btn:hover {
+  background-color: var(--badge-rose-bg);
+  color: var(--badge-rose-text);
+  border-color: var(--badge-rose-border);
+}
+
+.sidebar-logout-btn:active {
+  transform: scale(0.95);
+}
+
+.sidebar-backdrop {
+  display: none;
 }
 
 

@@ -148,7 +148,6 @@ export default function Sidebar({
             </div>
             <div className="user-meta-group">
               <span className="user-full-name">{user?.name || 'Alex Morgan'}</span>
-              <span className="user-designation">{user?.role || 'Engineering Manager'}</span>
             </div>
             {onLogout && (
               <button 
