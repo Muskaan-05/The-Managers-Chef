@@ -487,3 +487,15 @@ export async function processMeetingAI(meetingId) {
     method: 'POST',
   });
 }
+
+// -------------------------------------------------------------
+// Event Bot Launch Service
+// -------------------------------------------------------------
+
+export async function launchBotForEvent(eventId) {
+  return await request(`/api/events/${eventId}/join_bot`, {
+    method: 'POST',
+  });
+}
+
+

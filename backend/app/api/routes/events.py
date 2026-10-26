@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
@@ -8,6 +8,12 @@ from app.database.session import get_db
 from app.auth.dependencies import get_current_user
 from app.models.user import User
 from app.models.event import Event
+from app.models.meeting import Meeting
+from app.services.meeting_service import get_or_create_meeting_from_event
+from app.services.scraper_service import background_bot_session, update_bot_details
+from app.integrations.google_meet_scraper import is_process_running
+from app.api.schemas.meeting_schema import JoinMeetingResponse
+from app.config import settings
 from app.api.schemas.event_schema import (
     EventCreate,
     EventUpdate,
@@ -88,3 +94,47 @@ def delete_event(
     db.delete(event)
     db.commit()
     return None
+
+
+@router.post("/{event_id}/join_bot", response_model=JoinMeetingResponse)
+def join_bot_for_event(
+    event_id: UUID,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Resolve or create a meeting linked to this event
+    meeting = get_or_create_meeting_from_event(db, current_user.id, event_id)
+
+    # Mirror existing join_meeting early‑return logic
+    if meeting.status == "bot_active":
+        if is_process_running(meeting.bot_process_id):
+            return {
+                "status": "already_active",
+                "meeting_id": meeting.id,
+                "bot_pid": meeting.bot_process_id,
+                "meet_link": meeting.meet_link,
+                "message": "Meeting capture bot is already running for this meeting.",
+            }
+        # Worker is dead or process defunct; reset status so it can be relaunched
+        update_bot_details(db, current_user.id, meeting.id, bot_process_id=None, status="scheduled")
+
+    meet_link = meeting.meet_link or settings.MOCK_MEET_LINK
+    if not meet_link:
+        raise HTTPException(status_code=400, detail="No conference meet link provided or found on meeting")
+
+    # Launch bot in background
+    background_tasks.add_task(
+        background_bot_session,
+        meeting_id=meeting.id,
+        user_id=current_user.id,
+        meet_link=meet_link,
+    )
+    update_bot_details(db, current_user.id, meeting.id, status="bot_active")
+    return {
+        "status": "joining",
+        "meeting_id": meeting.id,
+        "meet_link": meet_link,
+        "message": "Background capture bot queued.",
+    }
+

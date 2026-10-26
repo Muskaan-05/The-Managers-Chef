@@ -1,0 +1,40 @@
+import os
+import signal
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+# Ensure transcripts directory is absolute relative to project root
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+TRANSCRIPTS_DIR = PROJECT_ROOT / "meeting_transcripts"
+TRANSCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def start_bot(meet_link: str, meeting_id: str) -> Dict[str, Any]:
+    """Launch the Selenium worker for a meeting.
+    Returns the process PID and the path to the transcript file.
+    """
+    output_path = TRANSCRIPTS_DIR / f"{meeting_id}.txt"
+    worker_script = Path(__file__).parent / "_meet_scraper_worker.py"
+    # Use PIPE for stdout/stderr so logs are visible in the console
+    process = subprocess.Popen(
+        [sys.executable, str(worker_script), meet_link, str(output_path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    return {"process_id": process.pid, "transcript_path": str(output_path)}
+
+
+def stop_bot(process_id: Optional[int] = None, transcript_path: Optional[str] = None) -> Optional[str]:
+    if process_id:
+        try:
+            os.kill(process_id, signal.SIGINT)
+        except (ProcessLookupError, PermissionError):
+            pass
+    if transcript_path:
+        path = Path(transcript_path)
+        if path.exists():
+            content = path.read_text(encoding="utf-8").strip()
+            return content if content else None
+    return None

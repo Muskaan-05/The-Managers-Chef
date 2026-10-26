@@ -23,6 +23,7 @@ import {
   endMeeting,
   processMeetingAI
 } from '../../services/api';
+import { launchBotForEvent } from '../../services/api';
 import { formatDisplayDate, parseMeetingTimes, isMeetingEntry } from '../../utils/dateUtils';
 import { Check, RefreshCw, AlertCircle } from 'lucide-react';
 import '../../styles/meetings.css';
@@ -70,8 +71,8 @@ export default function MeetingsView({
     return {
       id: m.id,
       title: m.title,
-      clientProject: 'General',
-      meetingType: m.bot_process_id ? 'AI Monitored' : 'Team Sync',
+      clientProject: m.source_event_id ? 'Google Calendar' : 'General',
+      meetingType: m.source_event_id ? 'Google Meeting' : (m.bot_process_id ? 'AI Monitored' : 'Team Sync'),
       date: isToday ? 'Today' : start.toLocaleDateString([], { month: 'short', day: 'numeric' }),
       time: timeOnly,
       timeLabel: `${formattedStart} (${m.status || 'scheduled'})`,
@@ -96,8 +97,9 @@ export default function MeetingsView({
       startDate: start,
       endDate: end,
       isPast: isPast,
-      isGoogle: false,
-      source: 'manual',
+      isGoogle: Boolean(m.source_event_id),
+      source: m.source_event_id ? 'google_calendar' : 'manual',
+      source_event_id: m.source_event_id,
     };
   }, []);
 
@@ -158,8 +160,18 @@ export default function MeetingsView({
 
       const mappedMeetings = (meetingsData || []).map(mapBackendMeeting);
       
+      // Build a set of event IDs that already have a resolved meeting record
+      const linkedEventIds = new Set(
+        mappedMeetings
+          .map((m) => m.source_event_id)
+          .filter(Boolean)
+      );
+
       // Filter events to only display calendar items that represent meetings
-      const meetingEvents = (eventsData || []).filter(isMeetingEntry);
+      // and haven't already been resolved into meetingsData
+      const meetingEvents = (eventsData || []).filter(
+        (e) => isMeetingEntry(e) && !linkedEventIds.has(e.id)
+      );
       const mappedEvents = meetingEvents.map(mapBackendEvent);
 
       // Combine and split into upcoming vs past
@@ -367,11 +379,22 @@ export default function MeetingsView({
   const handleStartBot = async (meeting) => {
     try {
       showToast('Launching background meeting bot...');
-      await joinMeeting(meeting.id, meeting.meetingLink);
+      let res;
+      if (meeting.isEvent) {
+        // Use the event endpoint to resolve/create the meeting and launch bot
+        res = await launchBotForEvent(meeting.id);
+      } else {
+        res = await joinMeeting(meeting.id, meeting.meetingLink);
+      }
       showToast('Meeting bot launched in background.');
       await fetchMeetingsAndEvents();
-      if (selectedDetailMeeting && selectedDetailMeeting.id === meeting.id) {
-        setSelectedDetailMeeting((prev) => ({ ...prev, rawStatus: 'bot_active' }));
+      if (selectedDetailMeeting && (selectedDetailMeeting.id === meeting.id || (res?.meeting_id && selectedDetailMeeting.id === res.meeting_id))) {
+        setSelectedDetailMeeting((prev) => ({
+          ...prev,
+          id: res?.meeting_id || prev.id,
+          rawStatus: 'bot_active',
+          isEvent: false,
+        }));
       }
     } catch (err) {
       showToast(`Bot error: ${err.message}`);

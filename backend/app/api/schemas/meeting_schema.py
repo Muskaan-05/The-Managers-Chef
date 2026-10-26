@@ -38,6 +38,7 @@ class MeetingOut(BaseModel):
     status: Optional[str] = "scheduled"
     bot_process_id: Optional[int] = None
     bot_transcript_path: Optional[str] = None
+    source_event_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True
@@ -80,6 +81,7 @@ class JoinMeetingRequest(BaseModel):
 
 class JoinMeetingResponse(BaseModel):
     status: str
+    meeting_id: Optional[UUID] = None
     bot_pid: Optional[int] = None
     meet_link: Optional[str] = None
     message: Optional[str] = None

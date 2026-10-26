@@ -412,7 +412,7 @@ export default function MeetingDetailModal({
 
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {/* Bot Launch / Stop Buttons */}
-                  {!meeting.isEvent && onStartBot && meeting.rawStatus !== 'bot_active' && !isCompleted && (
+                  {onStartBot && meeting.rawStatus !== 'bot_active' && !isCompleted && (
                     <button
                       type="button"
                       className="btn-secondary"
@@ -432,7 +432,7 @@ export default function MeetingDetailModal({
                     </button>
                   )}
 
-                  {!meeting.isEvent && onEndMeeting && meeting.rawStatus === 'bot_active' && (
+                  {onEndMeeting && meeting.rawStatus === 'bot_active' && (
                     <button
                       type="button"
                       className="btn-secondary"

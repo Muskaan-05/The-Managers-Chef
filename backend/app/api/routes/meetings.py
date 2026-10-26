@@ -29,6 +29,7 @@ from app.api.schemas.meeting_schema import (
     MeetingProcessResponse,
 )
 from app.services.scraper_service import background_bot_session, end_meeting_and_process_sync
+from app.integrations.google_meet_scraper import is_process_running
 from app.services.ai_pipeline_service import process_meeting_transcript
 from app.config import settings
 
@@ -146,12 +147,16 @@ def join_meeting(
 ):
     meeting = get_meeting_or_404(db, meeting_id, current_user.id)
     if meeting.status == "bot_active":
-        return {
-            "status": "already_active",
-            "bot_pid": meeting.bot_process_id,
-            "meet_link": meeting.meet_link,
-            "message": "Meeting capture bot is already running for this meeting.",
-        }
+        if is_process_running(meeting.bot_process_id):
+            return {
+                "status": "already_active",
+                "meeting_id": meeting_id,
+                "bot_pid": meeting.bot_process_id,
+                "meet_link": meeting.meet_link,
+                "message": "Meeting capture bot is already running for this meeting.",
+            }
+        # Worker is dead or process defunct; reset status so it can be relaunched
+        update_bot_details(db, current_user.id, meeting_id, bot_process_id=None, status="scheduled")
 
     meet_link = payload.meet_link or meeting.meet_link or settings.MOCK_MEET_LINK
     if not meet_link:
@@ -168,6 +173,7 @@ def join_meeting(
     update_bot_details(db, current_user.id, meeting_id, status="bot_active")
     return {
         "status": "joining",
+        "meeting_id": meeting_id,
         "meet_link": meet_link,
         "message": "Background capture bot queued.",
     }

@@ -83,3 +83,10 @@ class Meeting(Base):
         String,
         nullable=True,
     )
+
+    source_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("events.id"),
+        nullable=True,
+        unique=True,
+    )

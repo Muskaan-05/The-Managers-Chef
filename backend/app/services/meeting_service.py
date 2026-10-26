@@ -1,11 +1,16 @@
+import re
 import uuid
 from datetime import datetime
+from typing import Any
+from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.context import Context
 from app.models.context_item import ContextItem
+from app.models.event import Event
 from app.models.meeting import Meeting
 from app.services.context_service import (
     SOURCE_MEETING,
@@ -302,16 +307,20 @@ def update_meeting_summary(
     return meeting
 
 
+_UNSET = object()
+
+
 def update_bot_details(
     db: Session,
     user_id: uuid.UUID,
     meeting_id: uuid.UUID,
-    bot_process_id: int | None = None,
-    bot_transcript_path: str | None = None,
+    bot_process_id: Any = _UNSET,
+    bot_transcript_path: Any = _UNSET,
     status: str | None = None,
 ) -> Meeting | None:
     """
     Store meeting bot process/transcript information.
+    Passing bot_process_id=None explicitly clears the PID.
     """
 
     meeting = get_meeting(
@@ -323,10 +332,10 @@ def update_bot_details(
     if meeting is None:
         return None
 
-    if bot_process_id is not None:
+    if bot_process_id is not _UNSET:
         meeting.bot_process_id = bot_process_id
 
-    if bot_transcript_path is not None:
+    if bot_transcript_path is not _UNSET:
         meeting.bot_transcript_path = bot_transcript_path
 
     if status is not None:
@@ -366,3 +375,60 @@ def delete_meeting(
     db.commit()
 
     return True
+
+def get_or_create_meeting_from_event(db: Session, user_id: UUID, event_id: UUID) -> Meeting:
+    """Return an existing Meeting linked to the given Event, or create one.
+    Ownership and URL validation are enforced; raises HTTPException on error.
+    """
+    # Verify event exists and belongs to user
+    event: Event | None = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this event")
+
+    # Look for an existing meeting linked by source_event_id
+    stmt = select(Meeting).where(Meeting.user_id == user_id, Meeting.source_event_id == event_id)
+    meeting: Meeting | None = db.scalar(stmt)
+    if meeting:
+        return meeting
+
+    # Validate that the event provides a usable conference/Meet link
+    meet_link = None
+    if event.location and event.location.strip().startswith("http"):
+        meet_link = event.location.strip()
+    elif event.location:
+        match = re.search(r"https?://[^\s]+", event.location)
+        if match:
+            meet_link = match.group(0)
+
+    if not meet_link and event.description:
+        match = re.search(r"https?://meet\.google\.com/[^\s]+", event.description)
+        if not match:
+            match = re.search(r"https?://[^\s]+", event.description)
+        if match:
+            meet_link = match.group(0)
+
+    if not meet_link:
+        raise HTTPException(status_code=400, detail="Event does not contain a valid conference link")
+
+    # Create a new meeting linked to this event
+    new_meeting = Meeting(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        context_id=event.context_id,
+        title=event.title,
+        start_time=event.start_time,
+        end_time=event.end_time,
+        participants=event.participants,
+        meet_link=meet_link,
+        status="scheduled",
+        source_event_id=event.id,
+    )
+    db.add(new_meeting)
+    db.flush()
+    # Mirror notes into context
+    mirror_meeting_notes(db, new_meeting)
+    db.commit()
+    db.refresh(new_meeting)
+    return new_meeting
