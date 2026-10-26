@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -10,6 +10,16 @@ from app.database.base import Base
 
 class Event(Base):
     __tablename__ = "events"
+
+    __table_args__ = (
+        Index(
+            "uq_events_user_google_event_id",
+            "user_id",
+            "google_event_id",
+            unique=True,
+            postgresql_where=text("google_event_id IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

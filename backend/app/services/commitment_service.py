@@ -79,6 +79,7 @@ def list_commitments(
     user_id: uuid.UUID,
     status: str | None = None,
     context_id: uuid.UUID | None = None,
+    meeting_id: uuid.UUID | None = None,
 ) -> list[Commitment]:
     """
     Return commitments belonging to the authenticated user.
@@ -86,6 +87,7 @@ def list_commitments(
     Optional filters:
     - status
     - context_id
+    - meeting_id (source_reference)
     """
 
     statement = (
@@ -102,6 +104,11 @@ def list_commitments(
     if context_id is not None:
         statement = statement.where(
             Commitment.context_id == context_id
+        )
+
+    if meeting_id is not None:
+        statement = statement.where(
+            Commitment.source_reference == str(meeting_id)
         )
 
     return list(db.scalars(statement).all())

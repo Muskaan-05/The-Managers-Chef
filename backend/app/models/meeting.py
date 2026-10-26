@@ -90,3 +90,20 @@ class Meeting(Base):
         nullable=True,
         unique=True,
     )
+
+    ai_status: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+        default="pending",
+    )
+
+    ai_processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    ai_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+

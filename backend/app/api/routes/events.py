@@ -91,6 +91,9 @@ def delete_event(
     )
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+    db.query(Meeting).filter(Meeting.source_event_id == event.id).update(
+        {Meeting.source_event_id: None}, synchronize_session=False
+    )
     db.delete(event)
     db.commit()
     return None

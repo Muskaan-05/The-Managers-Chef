@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.event import Event
+from app.models.meeting import Meeting
 from app.models.google_credentials import GoogleCredentials
 from app.models.context import Context
 
@@ -322,7 +323,13 @@ def sync_google_events(
             created_count += 1
     returned_ids = {i.get("id") for i in raw_items if i.get("status") != "cancelled"}
     for gid, ev in list(existing_events.items()):
-        if gid not in returned_ids and now <= ev.start_time <= now + timedelta(days=60):
+        ev_start = ev.start_time
+        if ev_start is not None and ev_start.tzinfo is None:
+            ev_start = ev_start.replace(tzinfo=timezone.utc)
+        if gid not in returned_ids and ev_start is not None and now <= ev_start <= now + timedelta(days=60):
+            db.query(Meeting).filter(Meeting.source_event_id == ev.id).update(
+                {Meeting.source_event_id: None}, synchronize_session=False
+            )
             db.delete(ev)
     db.commit()
 

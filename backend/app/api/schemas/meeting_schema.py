@@ -39,6 +39,9 @@ class MeetingOut(BaseModel):
     bot_process_id: Optional[int] = None
     bot_transcript_path: Optional[str] = None
     source_event_id: Optional[UUID] = None
+    ai_status: Optional[str] = "pending"
+    ai_processed_at: Optional[datetime] = None
+    ai_error: Optional[str] = None
 
     class Config:
         from_attributes = True

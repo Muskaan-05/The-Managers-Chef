@@ -29,10 +29,19 @@ router = APIRouter(prefix="/api/commitments", tags=["commitments"])
 def list_commitments_route(
     status: Optional[str] = None,
     context_id: Optional[UUID] = None,
+    meeting_id: Optional[UUID] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return {"commitments": svc_list_commitments(db, current_user.id, status=status, context_id=context_id)}
+    return {
+        "commitments": svc_list_commitments(
+            db,
+            current_user.id,
+            status=status,
+            context_id=context_id,
+            meeting_id=meeting_id,
+        )
+    }
 
 
 @router.post("", response_model=CommitmentOut)
