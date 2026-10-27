@@ -17,10 +17,12 @@ class HindsightService:
 
     def __init__(self) -> None:
         api_key = os.getenv("HINDSIGHT_API_KEY")
+
         base_url = os.getenv(
             "HINDSIGHT_BASE_URL",
             "https://api.hindsight.vectorize.io",
         )
+
         self.bank_id = os.getenv(
             "HINDSIGHT_BANK_ID",
             "the-managers-chef",
@@ -45,9 +47,14 @@ class HindsightService:
         timestamp: Any | None = None,
         tags: list[str] | None = None,
         update_mode: str | None = None,
+        retain_async: bool = True,
     ):
         """
         Store or update information in the Ask Chef memory bank.
+
+        retain_async=True allows Hindsight to process the memory
+        asynchronously instead of making the application wait
+        for the complete memory-processing pipeline.
 
         document_id provides a stable identifier so the same
         source record can be updated instead of creating an
@@ -66,6 +73,7 @@ class HindsightService:
             timestamp=timestamp,
             tags=tags,
             update_mode=update_mode,
+            retain_async=retain_async,
         )
 
     def recall(

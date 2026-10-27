@@ -31,6 +31,7 @@ def process_meeting_transcript(
 ) -> Dict[str, Any]:
     """
     Idempotent AI meeting processing pipeline.
+
     1. Retrieves meeting and ensures valid transcript.
     2. Runs MeetingSummarizer (or fallback analysis).
     3. Persists meeting summary.
@@ -243,6 +244,7 @@ def process_meeting_transcript(
                         f"user:{user_id}",
                     ],
                     update_mode="replace",
+                    retain_async=True,
                 )
 
             except Exception as hindsight_exc:
@@ -336,6 +338,7 @@ def process_meeting_transcript(
                             f"user:{user_id}",
                         ],
                         update_mode="replace",
+                        retain_async=True,
                     )
 
                 except Exception as hindsight_exc:
@@ -509,6 +512,7 @@ def process_meeting_transcript(
                             f"user:{user_id}",
                         ],
                         update_mode="replace",
+                        retain_async=True,
                     )
 
                 except Exception as hindsight_exc:
