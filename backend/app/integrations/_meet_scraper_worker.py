@@ -3,12 +3,95 @@ import os
 import signal
 import time
 import logging
+import re
 from pathlib import Path
 from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+
+POLL_INTERVAL = 3
+FLUSH_AFTER = 9
+
+GENERIC_LABELS = {
+    "captions",
+    "turn on captions",
+    "turn off captions",
+    "captions are on",
+    "captions are off",
+}
+
+
+def normalize_text(text):
+    """Normalize whitespace for reliable caption comparisons."""
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def get_caption_speaker(elements, By):
+    """
+    Try to identify the speaker from caption elements or nearby ancestors.
+    Returns None when no reliable speaker label is exposed.
+    """
+    for element in elements:
+        current = element
+
+        for _ in range(5):
+            for attr in ("data-speaker-name", "aria-label", "title"):
+                try:
+                    label = normalize_text(current.get_attribute(attr))
+                    if (
+                        label
+                        and label.lower() not in GENERIC_LABELS
+                        and len(label) <= 100
+                    ):
+                        return label
+                except Exception:
+                    pass
+
+            try:
+                current = current.find_element(By.XPATH, "..")
+            except Exception:
+                break
+
+    return None
+
+
+def get_new_text(previous, current):
+    """
+    Return only the new portion of a caption snapshot.
+    Handles growing captions and overlapping revised snapshots.
+    """
+    previous = normalize_text(previous)
+    current = normalize_text(current)
+
+    if not current:
+        return ""
+
+    if not previous:
+        return current
+
+    if current == previous:
+        return ""
+
+    # Meet extended the existing caption.
+    if current.startswith(previous):
+        return current[len(previous):].strip()
+
+    # The current snapshot is an older/shorter version.
+    if previous.startswith(current):
+        return ""
+
+    # Handle partial overlap when the caption window changes.
+    max_overlap = min(len(previous), len(current))
+
+    for size in range(max_overlap, 0, -1):
+        if previous[-size:] == current[:size]:
+            return current[size:].strip()
+
+    # No overlap detected; treat it as a new caption.
+    return current
 
 def main():
     if len(sys.argv) < 3:
@@ -69,45 +152,115 @@ def main():
             logger.warning(f"Could not enable captions automatically: {e}")
 
         with output_path.open("a", encoding="utf-8") as f:
-            previous_texts = set()
-            last_caption = ""
+            pending_text = ""
+            pending_speaker = None
+            last_change_time = time.monotonic()
+            last_snapshot = ""
 
             while running:
-                time.sleep(1)
+                time.sleep(POLL_INTERVAL)
 
                 try:
                     caption_elems = driver.find_elements(
                         By.CSS_SELECTOR, "[aria-label='Captions'] .ygicle"
                     )
 
-                    current_text = " ".join(
-                        elem.text.strip()
+                    visible_parts = [
+                        normalize_text(elem.text)
                         for elem in caption_elems
-                        if elem.text.strip()
-                    ).strip()
+                        if normalize_text(elem.text)
+                    ]
+                    current_text = normalize_text(" ".join(visible_parts))
+                    current_speaker = get_caption_speaker(caption_elems, By)
 
-                    if current_text and current_text != last_caption:
-                        if current_text.startswith(last_caption):
-                            # Save only the newly added portion.
-                            new_text = current_text[len(last_caption):].strip()
-                        else:
-                            # Caption changed or a new caption replaced the old one.
-                            new_text = current_text
-
-                        if new_text:
-                            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-                            f.write(f"[{timestamp}] {new_text}\n")
+                    if not current_text:
+                        # Flush pending text if captions disappear.
+                        if pending_text and (
+                            time.monotonic() - last_change_time >= FLUSH_AFTER
+                        ):
+                            line = (
+                                f"{pending_speaker}: {pending_text}"
+                                if pending_speaker
+                                else pending_text
+                            )
+                            f.write(line + "\n")
                             f.flush()
 
-                        last_caption = current_text
+                            pending_text = ""
+                            pending_speaker = None
+                            last_snapshot = ""
+
+                        continue
+
+                    now = time.monotonic()
+
+                    # A speaker change finalizes the previous speaker's text.
+                    if (
+                        pending_text
+                        and current_speaker
+                        and pending_speaker
+                        and current_speaker != pending_speaker
+                    ):
+                        line = (
+                            f"{pending_speaker}: {pending_text}"
+                            if pending_speaker
+                            else pending_text
+                        )
+                        f.write(line + "\n")
+                        f.flush()
+
+                        pending_text = ""
+                        last_snapshot = ""
+
+                    # Avoid processing an identical caption snapshot repeatedly.
+                    if current_text != last_snapshot:
+                        new_text = get_new_text(last_snapshot, current_text)
+
+                        if new_text:
+                            if pending_text:
+                                pending_text = normalize_text(
+                                    pending_text + " " + new_text
+                                )
+                            else:
+                                pending_text = new_text
+                                pending_speaker = current_speaker
+
+                            last_change_time = now
+
+                        last_snapshot = current_text
+
+                    # Flush the accumulated caption after 9 seconds of inactivity.
+                    if (
+                        pending_text
+                        and now - last_change_time >= FLUSH_AFTER
+                    ):
+                        line = (
+                            f"{pending_speaker}: {pending_text}"
+                            if pending_speaker
+                            else pending_text
+                        )
+                        f.write(line + "\n")
+                        f.flush()
+
+                        pending_text = ""
+                        pending_speaker = None
+                        last_snapshot = ""
 
                 except WebDriverException as e:
                     logger.error(
                         "WebDriver session lost; stopping caption capture: %s", e
                     )
                     break
-        driver.quit()
-        logger.info("Browser closed, bot exiting gracefully")
+
+            # Preserve the final pending caption when the worker stops.
+            if pending_text:
+                line = (
+                    f"{pending_speaker}: {pending_text}"
+                    if pending_speaker
+                    else pending_text
+                )
+                f.write(line + "\n")
+                f.flush()
     except Exception as e:
         logger.exception("Unhandled exception in scraper worker")
         # Write a fallback line to transcript so stop_bot can return something
